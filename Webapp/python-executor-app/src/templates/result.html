@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title> Result IE Function</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f6fb; margin: 0; padding: 0; }
+        .container { background: #fff; max-width: 900px; margin: 40px auto; padding: 32px 36px 28px 36px; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.08);}
+        h1 { text-align: center; color: #2d3a4b; margin-bottom: 28px;}
+        .result-table { margin-top: 30px; width: 100%; border-collapse: collapse; font-size: 0.97em;}
+        .result-table th, .result-table td { border: 1px solid #d1d9e6; padding: 7px 8px; text-align: left;}
+        .result-table th { background: #f4f6fb; color: #2355d6;}
+        .result-table tr:nth-child(even) { background: #f8fafc;}
+        a { display: inline-block; margin-top: 24px; color: #2355d6; text-decoration: none; font-weight: bold;}
+        a:hover { text-decoration: underline;}
+        #searchInput { width: 100%; padding: 10px; margin-top: 18px; margin-bottom: 18px; border-radius: 6px; border: 1px solid #d1d9e6; font-size: 1em;}
+        #dropdownFilters {
+            /* position: sticky; */
+            /* top: 0; */
+            background: #fff;
+            z-index: 10;
+            padding: 12px 0 12px 0;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: flex-start;
+        }
+        #dropdownFilters select {
+            min-width: 120px;
+            padding: 6px 10px;
+            border-radius: 6px;
+            border: 1px solid #bfc9d9;
+            background: #f8fafc;
+            color: #2d3a4b;
+            font-size: 1em;
+            transition: border 0.2s;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+        }
+        #dropdownFilters select:focus {
+            border: 1.5px solid #2355d6;
+            outline: none;
+            background: #fff;
+        }
+        #dropdownFilters option {
+            background: #fff;
+            color: #2d3a4b;
+        }
+
+
+        /* Sticky header */
+        .result-table thead th {
+            position: sticky;
+            top: 0;
+            background: #f4f6fb;
+            z-index: 20;
+        }
+
+        /* Sticky first column */
+        .result-table th:first-child,
+        .result-table td:first-child {
+            position: sticky;
+            left: 0;
+            background: #f4f6fb;
+            z-index: 15;
+            border-right: 2px solid #d1d9e6;
+        }
+        #tableArea {
+            max-height: 500px;
+            overflow: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Result IE Function</h1>
+        <input type="text" id="searchInput" placeholder="ค้นหาในตาราง...">
+        <div id="dropdownFilters" style="margin-bottom: 12px;"></div>
+        <div id="tableArea">{{ table_html|safe }}</div>
+        <a href="{{ url_for('index') }}">&#8592; กลับหน้าแรก</a>
+    </div>
+    <script>
+window.addEventListener('DOMContentLoaded', function() {
+    let table = document.querySelector('.result-table');
+    if (!table) return;
+    let thead = table.querySelector('thead');
+    let tbody = table.querySelector('tbody');
+    let headers = Array.from(thead.querySelectorAll('th'));
+    let dropdownDiv = document.getElementById('dropdownFilters');
+    dropdownDiv.innerHTML = '';
+
+    headers.forEach((th, colIdx) => {
+        let select = document.createElement('select');
+        select.innerHTML = '<option value="">-- เลือก ' + th.textContent + ' --</option>';
+        let values = new Set();
+        tbody.querySelectorAll('tr').forEach(tr => {
+            let td = tr.children[colIdx];
+            if (td) values.add(td.textContent.trim());
+        });
+        Array.from(values).sort().forEach(val => {
+            select.innerHTML += `<option value="${val}">${val}</option>`;
+        });
+        select.addEventListener('change', filterTable);
+        dropdownDiv.appendChild(select);
+    });
+
+    function filterTable() {
+        let selects = dropdownDiv.querySelectorAll('select');
+        tbody.querySelectorAll('tr').forEach(tr => {
+            let show = true;
+            selects.forEach((sel, idx) => {
+                let val = sel.value;
+                if (val && tr.children[idx].textContent.trim() !== val) {
+                    show = false;
+                }
+            });
+            tr.style.display = show ? '' : 'none';
+        });
+    }
+});
+</script>
+</body>
+</html>
