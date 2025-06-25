@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title> Result IE Function</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f6fb; margin: 0; padding: 0; }
         .container { background: #fff; max-width: 900px; margin: 40px auto; padding: 32px 36px 28px 36px; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.08);}
@@ -69,6 +70,28 @@
             max-height: 500px;
             overflow: auto;
         }
+        .btn-download {
+    display: inline-block;
+    background: #28a745;
+    color: #fff !important;
+    padding: 12px 28px;
+    border-radius: 8px;
+    font-size: 1.08em;
+    font-weight: 500;
+    margin: 24px 0 0 0;
+    text-decoration: none;
+    box-shadow: 0 2px 8px rgba(40,167,69,0.08);
+    transition: background 0.2s, box-shadow 0.2s;
+}
+.btn-download:hover {
+    background: #218838;
+    color: #fff !important;
+    box-shadow: 0 4px 16px rgba(40,167,69,0.16);
+}
+.btn-download .fa-file-excel {
+    margin-right: 8px;
+    font-size: 1.1em;
+}
     </style>
 </head>
 <body>
@@ -78,6 +101,11 @@
         <div id="dropdownFilters" style="margin-bottom: 12px;"></div>
         <div id="tableArea">{{ table_html|safe }}</div>
         <a href="{{ url_for('index') }}">&#8592; กลับหน้าแรก</a>
+        {% if download_link %}
+            <a href="{{ download_link }}" class="btn-download">
+                <i class="fa fa-file-excel"></i> ดาวน์โหลด Excel
+            </a>
+        {% endif %}
     </div>
     <script>
 window.addEventListener('DOMContentLoaded', function() {

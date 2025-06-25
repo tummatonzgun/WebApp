@@ -1,4 +1,4 @@
-from flask import Flask, request, render_template, redirect, url_for, flash, session
+from flask import Flask, request, render_template, redirect, url_for, flash, session, send_file
 import os
 import importlib
 import tempfile
@@ -24,6 +24,7 @@ def list_functions():
 def index():
     functions = list_functions()
     table_html = None
+    download_link = None
     if request.method == "POST":
         func_name = request.form.get("func_name")
         files = request.files.getlist("input_files")
@@ -45,15 +46,16 @@ def index():
                 return redirect(url_for("index"))
             
             output_files.sort(key=lambda x: os.path.getmtime(os.path.join(output_dir, x)), reverse=True)
-            output_fp = os.path.join(output_dir, output_files[0])  # <-- ต้องเป็น path
-
+            output_fp = os.path.join(output_dir, output_files[0])
             if output_fp.endswith(".xlsx"):
                 df = pd.read_excel(output_fp)
+                download_link = url_for("download_file", func_name=func_name, filename=output_files[0])
             else:
                 df = pd.read_csv(output_fp)
+                download_link = url_for("download_file", func_name=func_name, filename=output_files[0])
             table_html = df.to_html(classes="result-table", index=False, border=0)
             flash("ประมวลผลสำเร็จ")
-            return render_template("result.html", table_html=table_html)
+            return render_template("result.html", table_html=table_html, download_link=download_link)
         except Exception as e:
             flash(f"เกิดข้อผิดพลาด: {e}")
             return redirect(url_for("index"))
@@ -68,6 +70,12 @@ def result():
         flash("ไม่พบข้อมูลผลลัพธ์")
         return redirect(url_for("index"))
     return render_template("result.html", table_html=table_html)
+
+@app.route("/download/<func_name>/<filename>")
+def download_file(func_name, filename):
+    output_dir = os.path.join(BASE_DIR, f"output_{func_name}")
+    file_path = os.path.join(output_dir, filename)
+    return send_file(file_path, as_attachment=True)
 
 if __name__ == "__main__":
     ip= socket.gethostbyname(socket.gethostname())
