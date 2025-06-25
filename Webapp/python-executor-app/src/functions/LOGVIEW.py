@@ -14,7 +14,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 def find_input_files(input_pattern: str):
     if os.path.isdir(input_pattern):
         files = glob.glob(os.path.join(input_pattern, "*.txt")) + \
-                glob.glob(os.path.join(input_pattern, "*.TXT"))
+        glob.glob(os.path.join(input_pattern, "*.TXT"))
+        files = list(set(os.path.abspath(f) for f in files))
     else:
         files = glob.glob(input_pattern)
     return files
@@ -363,6 +364,12 @@ def filtered_mean(lst):
         return float('nan')
     return sum(filtered) / len(filtered)
 
+# กำหนด mapping เงื่อนไข Package group → Lead frame, SPEED ไม่ควรน้อยกว่า3 เขียนยังไง
+# ตัวอย่างการกำหนด mapping ตามที่ให้มา
+MAPPING = {
+    ('QFN', '<=5'): 'CU',
+    ('QFN', '<=4'): 'PPF',
+}
 def analyze_and_export_csv(summary_path, package_path, output_csv):
     df = pd.read_excel(summary_path)
     df2 = pd.read_excel(package_path)
@@ -398,7 +405,23 @@ def analyze_and_export_csv_from_df(summary_df, package_path, output_csv):
     df = df.drop(columns='FRAME_STOCK')
     df['TIME/STRIP'] = df['TIME/STRIP'].round(2)
     df.rename(columns={'X': 'FRAME_STOCK'}, inplace=True)
-    df_merged = pd.merge(df, df2[['FRAME_STOCK', 'PACKAGE_CODE','Package size ','Package group','Lead frame']], on='FRAME_STOCK', how='left')
+    df_merged = pd.merge(
+        df,
+        df2[['FRAME_STOCK', 'PACKAGE_CODE','Package size ','Package group','Lead frame','Unit/strip','Strip/lot']],
+        on='FRAME_STOCK',
+        how='left'
+    )
+
+    # เติมข้อมูล Package group ตาม SPEED ที่กำหนดไว้
+    df_merged['SPEED'] = df_merged.apply(
+        lambda row: MAPPING.get((str(row['Package group']), row['SPEED']), row['SPEED']),
+        axis=1
+    )
+    df_merged['Lead frame'] = df_merged.apply(
+        lambda row: MAPPING.get((str(row['Package group']), row['SPEED']), row['Lead frame']),
+        axis=1
+    )
+
     df_merged.to_csv(output_csv, index=False)
     print(f"✅ Exported summary CSV: {output_csv}")
 
@@ -414,10 +437,10 @@ def run(input_path, output_dir):
 
     # 2. ส่งเฉพาะไฟล์ใหม่ไปให้ summarize_sec_strip
     summary_df = summarize_sec_strip(output_dir, new_files)
-    package_path = os.path.join(BASE_DIR, "..", "Upload", "export package and frame stock Rev.01.xlsx")
+    package_path = os.path.join(BASE_DIR, "..", "Upload", "export package and frame stock Rev.02.xlsx")
     package_path = os.path.abspath(package_path)
     if not os.path.exists(package_path):
-        print("ไม่พบไฟล์ export package and frame stock Rev.01.xlsx ใน Upload")
+        print("ไม่พบไฟล์ export package and frame stock Rev.02.xlsx ใน Upload")
         return
     output_csv = os.path.join(output_dir, "Summary.csv")
     analyze_and_export_csv_from_df(summary_df, package_path, output_csv)
