@@ -70,9 +70,9 @@ def result():
 
 if __name__ == "__main__":
     ip= socket.gethostbyname(socket.gethostname())
-    app.run(debug=True, host='0.0.0.0', port=8080)
+    app.run(debug=True, host='0.0.0.0', port=80)
     
 # To run the app, use the command:
 # python app.py 
-# http://127.0.0.1:8080
-# or http://<your-ip>:8080/ if running on a server
+# http://127.0.0.1:80
+# or http://<your-ip>:80/ if running on a server
