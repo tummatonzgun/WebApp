@@ -74,4 +74,5 @@ if __name__ == "__main__":
     
 # To run the app, use the command:
 # python app.py 
-# http://127.0.0.1
+# http://127.0.0.1:8080
+# or http://<your-ip>:8080/ if running on a server
