@@ -398,7 +398,7 @@ def analyze_and_export_csv_from_df(summary_df, package_path, output_csv):
     df = df.drop(columns='FRAME_STOCK')
     df['TIME/STRIP'] = df['TIME/STRIP'].round(2)
     df.rename(columns={'X': 'FRAME_STOCK'}, inplace=True)
-    df_merged = pd.merge(df, df2[['FRAME_STOCK', 'PACKAGE_CODE']], on='FRAME_STOCK', how='left')
+    df_merged = pd.merge(df, df2[['FRAME_STOCK', 'PACKAGE_CODE','Package size ','Package group','Lead frame']], on='FRAME_STOCK', how='left')
     df_merged.to_csv(output_csv, index=False)
     print(f"✅ Exported summary CSV: {output_csv}")
 
@@ -414,10 +414,10 @@ def run(input_path, output_dir):
 
     # 2. ส่งเฉพาะไฟล์ใหม่ไปให้ summarize_sec_strip
     summary_df = summarize_sec_strip(output_dir, new_files)
-    package_path = os.path.join(BASE_DIR, "..", "Upload", "export package and frame stock.xlsx")
+    package_path = os.path.join(BASE_DIR, "..", "Upload", "export package and frame stock Rev.01.xlsx")
     package_path = os.path.abspath(package_path)
     if not os.path.exists(package_path):
-        print("ไม่พบไฟล์ export package and frame stock.xlsx ใน Upload")
+        print("ไม่พบไฟล์ export package and frame stock Rev.01.xlsx ใน Upload")
         return
     output_csv = os.path.join(output_dir, "Summary.csv")
     analyze_and_export_csv_from_df(summary_df, package_path, output_csv)
