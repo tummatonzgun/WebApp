@@ -76,3 +76,4 @@ if __name__ == "__main__":
 # python app.py 
 # http://127.0.0.1:80
 # or http://<your-ip>:80/ if running on a server
+# Make sure to have the functions directory with Python files containing a run function
