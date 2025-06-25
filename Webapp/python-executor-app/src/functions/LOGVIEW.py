@@ -4,6 +4,7 @@ import glob
 import numpy as np
 from pathlib import Path
 import time
+import uuid
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -229,7 +230,9 @@ def process_single_file_complete(input_file: str, output_dir: str):
     input_path = Path(input_file)
     output_path = Path(output_dir)
     output_path.mkdir(exist_ok=True)
-    output_file = output_path / f"{input_path.stem}.xlsx"
+    # สร้างชื่อไฟล์ใหม่แบบไม่ซ้ำ
+    unique_id = uuid.uuid4().hex
+    output_file = output_path / f"{input_path.stem}_{unique_id}.xlsx"
     try:
         df = load_and_parse_file(input_file)
         if df.empty:
@@ -319,20 +322,19 @@ def load_sec_strip_by_frame(filepath, sheet_name='Processed_Data'):
     df = df[df['sec/strip'].notna() & df['speed'].notna()]
     return df
 
-def summarize_sec_strip(files_folder):
+def summarize_sec_strip(files_folder, file_list):
     data = {}
-    for filename in os.listdir(files_folder):
-        if filename.lower().endswith('.xlsx'):
-            filepath = os.path.join(files_folder, filename)
-            try:
-                df = load_sec_strip_by_frame(filepath)
-                summary = df.groupby(['frame', 'speed'])['sec/strip'].mean()
-                summary.index = summary.index.map(lambda x: f"{x[0]}_speed{x[1]}")
-                file_key = os.path.splitext(filename)[0]
-                data[file_key] = summary
-            except Exception as e:
-                print(f"ข้ามไฟล์ {filename} : {e}")
-                continue
+    for filename in file_list:
+        filepath = os.path.join(files_folder, filename)
+        try:
+            df = load_sec_strip_by_frame(filepath)
+            summary = df.groupby(['frame', 'speed'])['sec/strip'].mean()
+            summary.index = summary.index.map(lambda x: f"{x[0]}_speed{x[1]}")
+            file_key = os.path.splitext(filename)[0]
+            data[file_key] = summary
+        except Exception as e:
+            print(f"ข้ามไฟล์ {filename} : {e}")
+            continue
     result_df = pd.DataFrame(data)
     result_df = result_df.sort_index()
     return result_df
@@ -401,8 +403,17 @@ def analyze_and_export_csv_from_df(summary_df, package_path, output_csv):
     print(f"✅ Exported summary CSV: {output_csv}")
 
 def run(input_path, output_dir):
+    # 1. ประมวลผลไฟล์ input และเก็บชื่อไฟล์ .xlsx ที่สร้างใหม่
+    before_files = set(f for f in os.listdir(output_dir) if f.lower().endswith('.xlsx'))
     process_multiple_files_complete(input_path, output_dir)
-    summary_df = summarize_sec_strip(output_dir)
+    after_files = set(f for f in os.listdir(output_dir) if f.lower().endswith('.xlsx'))
+    new_files = list(after_files - before_files)
+    if not new_files:
+        print("ไม่พบไฟล์ .xlsx ใหม่")
+        return
+
+    # 2. ส่งเฉพาะไฟล์ใหม่ไปให้ summarize_sec_strip
+    summary_df = summarize_sec_strip(output_dir, new_files)
     package_path = os.path.join(BASE_DIR, "..", "Upload", "export package and frame stock.xlsx")
     package_path = os.path.abspath(package_path)
     if not os.path.exists(package_path):
