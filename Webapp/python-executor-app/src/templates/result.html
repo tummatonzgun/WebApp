@@ -142,9 +142,18 @@ window.addEventListener('DOMContentLoaded', function() {
                     show = false;
                 }
             });
+            // เพิ่ม filter จากช่องค้นหา
+            let searchVal = document.getElementById('searchInput').value.trim().toLowerCase();
+            if (show && searchVal) {
+                let rowText = Array.from(tr.children).map(td => td.textContent.toLowerCase()).join(' ');
+                if (!rowText.includes(searchVal)) show = false;
+            }
             tr.style.display = show ? '' : 'none';
         });
     }
+
+    // เพิ่ม event สำหรับช่องค้นหา
+    document.getElementById('searchInput').addEventListener('input', filterTable);
 });
 </script>
 </body>

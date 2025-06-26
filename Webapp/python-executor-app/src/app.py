@@ -80,10 +80,7 @@ def download_file(func_name, filename):
 if __name__ == "__main__":
     ip= socket.gethostbyname(socket.gethostname())
     app.run(debug=True, host='0.0.0.0', port=80)
-    
-# To run the app, use the command:
-# python app.py 
-# http://127.0.0.1:80
-# or http://<your-ip>:80/ if running on a server
+
+# http://<your-ip>:80/ if running on a server
 # Make sure to have the functions directory with Python files containing a run function
-# Example function file:
+# Version 1.2.1
