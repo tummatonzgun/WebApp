@@ -111,7 +111,7 @@
             </ul>
           {% endif %}
         {% endwith %}
-        <form method="post" enctype="multipart/form-data">
+        <form method="post" enctype="multipart/form-data" id="mainForm">
             <label>เลือกฟังก์ชัน:</label>
             <select name="func_name">
                 {% for func in functions %}
@@ -120,12 +120,28 @@
             </select>
             <label>อัปโหลดไฟล์ (เลือกได้หลายไฟล์):</label>
             <input type="file" name="input_files" multiple>
+            <label>
+                <input type="checkbox" name="show_table" checked>
+                แสดงผลลัพธ์บนเว็บ
+            </label>
             <button type="submit">Run</button>
         </form>
+        <div id="loading" style="display:none; text-align:center; margin-top:18px;">
+            <span style="color:#2355d6; font-size:1.1em;">
+                <img src="https://i.imgur.com/llF5iyg.gif" alt="loading" style="width:28px;vertical-align:middle;margin-right:8px;">
+                กำลังประมวลผล กรุณารอสักครู่...
+            </span>
+        </div>
         {% if table_html %}
             <h2 style="margin-top:32px; color:#2d3a4b; text-align:center;">ผลลัพธ์ตัวอย่าง</h2>
             <div style="overflow-x:auto;">{{ table_html|safe }}</div>
         {% endif %}
+        <a href="{{ url_for('lookup_last_type_route') }}">ค้นหา Last_type จาก BOM</a>
     </div>
+    <script>
+    document.getElementById('mainForm').addEventListener('submit', function() {
+        document.getElementById('loading').style.display = 'block';
+    });
+    </script>
 </body>
 </html>
