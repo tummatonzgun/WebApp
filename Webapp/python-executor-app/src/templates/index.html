@@ -41,7 +41,7 @@
             transition: border 0.2s;
         }
         select:focus, input[type="file"]:focus {
-            border: 1.5px solidrgb(217, 121, 255);
+            border: 1.5px solid rgb(35, 85, 250);
             outline: none;
             background: #fff;
         }
@@ -92,6 +92,27 @@
         .result-table tr:nth-child(even) {
             background: #f8fafc;
         }
+        .lookup-btn {
+            display: inline-block;
+            background: linear-gradient(90deg,hsl(209, 76.70%, 57.80%) 0%,rgb(73, 143, 223) 100%);
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            padding: 10px 28px;
+            font-size: 1em;
+            font-weight: 500;
+            cursor: pointer;
+            text-decoration: none;
+            margin-top: 18px;
+            box-shadow: 0 2px 8px rgba(79,140,255,0.08);
+            transition: background 0.2s, box-shadow 0.2s;
+        }
+        .lookup-btn:hover {
+            background: linear-gradient(90deg, #2563eb 0%, #4f8cff 100%);
+            box-shadow: 0 4px 16px rgba(79,140,255,0.15);
+            color: #fff;
+            text-decoration: none;
+        }
         @media (max-width: 600px) {
             .container {
                 padding: 18px 8px;
@@ -113,7 +134,7 @@
         {% endwith %}
         <form method="post" enctype="multipart/form-data" id="mainForm">
             <label>เลือกฟังก์ชัน:</label>
-            <select name="func_name">
+            <select name="func_name" id="funcSelect">
                 {% for func in functions %}
                 <option value="{{ func }}">{{ func }}</option>
                 {% endfor %}
@@ -136,12 +157,29 @@
             <h2 style="margin-top:32px; color:#2d3a4b; text-align:center;">ผลลัพธ์ตัวอย่าง</h2>
             <div style="overflow-x:auto;">{{ table_html|safe }}</div>
         {% endif %}
-        <a href="{{ url_for('lookup_last_type_route') }}">ค้นหา Last_type จาก BOM</a>
+        <!-- ลิงก์นี้จะถูกซ่อน/แสดงด้วย JS -->
+        <a href="{{ url_for('lookup_last_type_route') }}" id="lookupLastTypeLink" class="lookup-btn" style="display:none;">
+            ค้นหา Last_type จาก BOM
+        </a>
     </div>
     <script>
     document.getElementById('mainForm').addEventListener('submit', function() {
         document.getElementById('loading').style.display = 'block';
     });
+
+    // แสดงลิงก์ค้นหา Last_type เฉพาะเมื่อเลือก PNP_CHANG_TYPE
+    function toggleLookupLink() {
+        var func = document.getElementById('funcSelect').value;
+        var link = document.getElementById('lookupLastTypeLink');
+        if (func === "PNP_CHANG_TYPE") {
+            link.style.display = "inline-block";
+        } else {
+            link.style.display = "none";
+        }
+    }
+    document.getElementById('funcSelect').addEventListener('change', toggleLookupLink);
+    // เรียกครั้งแรกตอนโหลดหน้า
+    toggleLookupLink();
     </script>
 </body>
 </html>

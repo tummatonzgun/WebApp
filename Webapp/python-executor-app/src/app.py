@@ -83,7 +83,9 @@ def download_file(func_name, filename):
     file_path = os.path.join(output_dir, filename)
     return send_file(file_path, as_attachment=True)
 
-@app.route("/lookup_last_type", methods=["GET", "POST"])
+#เป็นฟังก์ชันสำหรับค้นหา Last Type ในไฟล์ PNP_CHANG_TYPE
+# ใช้สำหรับอัปโหลดไฟล์ bom_no และค้นหา Last Type จากไฟล์
+@app.route("/lookup_last_type", methods=["GET", "POST"]) 
 def lookup_last_type_route():
     table_html = None
     download_link = None
@@ -92,6 +94,7 @@ def lookup_last_type_route():
         if not file or file.filename == "":
             flash("กรุณาอัปโหลดไฟล์ที่มีคอลัมน์ bom_no")
             return redirect(url_for("lookup_last_type_route"))
+        
         temp_dir = tempfile.mkdtemp()
         file_path = os.path.join(temp_dir, file.filename)
         file.save(file_path)
@@ -124,4 +127,4 @@ if __name__ == "__main__":
 
 # http://<your-ip>:80/ if running on a server
 # Make sure to have the functions directory with Python files containing a run function
-# Version 1.2.1
+# Version 1.3
