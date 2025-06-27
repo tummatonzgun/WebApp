@@ -6,23 +6,68 @@ import shutil
 import pandas as pd
 import socket
 import datetime
+import logging
 from functions.PNP_CHANG_TYPE import lookup_last_type
 
-app = Flask(__name__)
-app.secret_key = "your_secret_key_change_this_in_production"
+# Configuration Class
+class Config:
+    SECRET_KEY = os.environ.get('SECRET_KEY') or 'your_secret_key_change_this_in_production'
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    FUNCTIONS_DIR = os.path.join(BASE_DIR, "functions")
+    MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
+    ALLOWED_EXTENSIONS = ['.xlsx', '.xls', '.csv']
+    HOST = '0.0.0.0'
+    PORT = 80
+    DEBUG = True
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-FUNCTIONS_DIR = os.path.join(BASE_DIR, "functions")
+# Setup logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+app = Flask(__name__)
+app.config.from_object(Config)
+
+# Utility Classes
+class FileUtils:
+    @staticmethod
+    def validate_file(file):
+        """Validate uploaded file"""
+        if not file or file.filename == "":
+            return False, "กรุณาอัปโหลดไฟล์"
+        
+        if not file.filename.lower().endswith(tuple(Config.ALLOWED_EXTENSIONS)):
+            return False, f"กรุณาอัปโหลดไฟล์ {', '.join(Config.ALLOWED_EXTENSIONS)} เท่านั้น"
+        
+        return True, None
+    
+    @staticmethod
+    def check_bom_column(df):
+        """Check if DataFrame has BOM column"""
+        bom_columns = ['bom_no', 'bomno', 'bom no', 'bom_number']
+        for col in df.columns:
+            if str(col).lower().strip() in bom_columns:
+                return True, col
+        return False, None
+    
+    @staticmethod
+    def save_result_file(df, output_dir, prefix="result"):
+        """Save DataFrame to Excel with timestamp"""
+        os.makedirs(output_dir, exist_ok=True)
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"{prefix}_{timestamp}.xlsx"
+        file_path = os.path.join(output_dir, filename)
+        df.to_excel(file_path, index=False)
+        return filename, file_path
 
 def list_functions():
     """List all available function modules"""
     files = []
     try:
-        for f in os.listdir(FUNCTIONS_DIR):
+        for f in os.listdir(Config.FUNCTIONS_DIR):
             if f.endswith(".py") and not f.startswith("__"):
                 files.append(f[:-3])
     except Exception as e:
-        print(f"Error listing functions: {e}")
+        logger.error(f"Error listing functions: {e}")
     return files
 
 @app.route("/", methods=["GET", "POST"])
@@ -44,7 +89,7 @@ def index():
             return redirect(url_for("index"))
 
         temp_input = tempfile.mkdtemp()
-        output_dir = os.path.join(BASE_DIR, f"output_{func_name}")
+        output_dir = os.path.join(Config.BASE_DIR, f"output_{func_name}")
         
         try:
             # Ensure output directory exists
@@ -96,6 +141,7 @@ def index():
                                          total_records=len(df),
                                          func_name=func_name)
                 except Exception as e:
+                    logger.error(f"Error displaying table: {e}")
                     flash(f"ไม่สามารถแสดงตารางได้: {str(e)}", "warning")
                     return render_template("result.html", 
                                          table_html=None, 
@@ -109,8 +155,8 @@ def index():
                                      func_name=func_name)
                 
         except Exception as e:
+            logger.error(f"Error in index route: {e}")
             flash(f"เกิดข้อผิดพลาด: {str(e)}", "error")
-            print(f"Error in index route: {e}")
             return redirect(url_for("index"))
         finally:
             if os.path.exists(temp_input):
@@ -129,9 +175,9 @@ def download_file(func_name, filename):
     """Download processed files"""
     try:
         if func_name == 'lookup_last_type':
-            output_dir = os.path.join(BASE_DIR, "output_lookup_last_type")
+            output_dir = os.path.join(Config.BASE_DIR, "output_lookup_last_type")
         else:
-            output_dir = os.path.join(BASE_DIR, f"output_{func_name}")
+            output_dir = os.path.join(Config.BASE_DIR, f"output_{func_name}")
         
         file_path = os.path.join(output_dir, filename)
         
@@ -141,6 +187,7 @@ def download_file(func_name, filename):
         
         return send_file(file_path, as_attachment=True)
     except Exception as e:
+        logger.error(f"Download error: {e}")
         flash(f"เกิดข้อผิดพลาดในการดาวน์โหลด: {str(e)}", "error")
         return redirect(url_for("index"))
 
@@ -152,21 +199,18 @@ def lookup_last_type_route():
     
     if request.method == "POST":
         # Debug: ตรวจสอบข้อมูลที่ส่งมา
-        print(f"📨 Form data: {request.form}")
-        print(f"📁 Files: {request.files}")
-        print(f"📋 Files keys: {list(request.files.keys())}")
+        logger.info(f"📨 Form data: {request.form}")
+        logger.info(f"📁 Files: {request.files}")
+        logger.info(f"📋 Files keys: {list(request.files.keys())}")
         
         file = request.files.get("file")
-        print(f"🔍 File object: {file}")
-        print(f"📄 File name: {file.filename if file else 'None'}")
+        logger.info(f"🔍 File object: {file}")
+        logger.info(f"📄 File name: {file.filename if file else 'None'}")
         
-        if not file or file.filename == "":
-            flash("กรุณาอัปโหลดไฟล์", "error")
-            return redirect(url_for("lookup_last_type_route"))
-        
-        # ตรวจสอบประเภทไฟล์
-        if not file.filename.lower().endswith(('.xlsx', '.xls')):
-            flash("กรุณาอัปโหลดไฟล์ Excel (.xlsx หรือ .xls) เท่านั้น", "error")
+        # Validate file using utility
+        is_valid, error_msg = FileUtils.validate_file(file)
+        if not is_valid:
+            flash(error_msg, "error")
             return redirect(url_for("lookup_last_type_route"))
         
         temp_dir = tempfile.mkdtemp()
@@ -179,12 +223,10 @@ def lookup_last_type_route():
             # ตรวจสอบไฟล์หลังบันทึกแล้ว
             try:
                 temp_df = pd.read_excel(file_path)
-                print(f"📋 ไฟล์ที่อัปโหลดมีคอลัมน์: {list(temp_df.columns)}")
+                logger.info(f"📋 ไฟล์ที่อัปโหลดมีคอลัมน์: {list(temp_df.columns)}")
                 
-                # ตรวจสอบคอลัมน์ bom_no
-                has_bom = any(str(col).lower().strip() in ['bom_no', 'bomno', 'bom no', 'bom_number'] 
-                             for col in temp_df.columns)
-                
+                # ตรวจสอบคอลัมน์ bom_no ด้วย utility
+                has_bom, bom_col = FileUtils.check_bom_column(temp_df)
                 if not has_bom:
                     available_cols = ", ".join(str(col) for col in temp_df.columns)
                     flash(f"ไฟล์ไม่มีคอลัมน์ bom_no - คอลัมน์ที่มี: {available_cols}", "error")
@@ -195,10 +237,10 @@ def lookup_last_type_route():
                 return redirect(url_for("lookup_last_type_route"))
             
             # ดำเนินการ lookup
-            output_dir = os.path.join(BASE_DIR, "output_PNP_CHANG_TYPE")
+            output_dir = os.path.join(Config.BASE_DIR, "output_PNP_CHANG_TYPE")
             os.makedirs(output_dir, exist_ok=True)
             
-            print(f"🔍 เริ่มค้นหาข้อมูล...")
+            logger.info("🔍 เริ่มค้นหาข้อมูล...")
             df_result = lookup_last_type(file_path, output_dir)
             
             if df_result is not None and not df_result.empty:
@@ -212,14 +254,9 @@ def lookup_last_type_route():
                     escape=False
                 )
                 
-                # Save result
-                download_dir = os.path.join(BASE_DIR, "output_lookup_last_type")
-                os.makedirs(download_dir, exist_ok=True)
-                
-                timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                filename = f"last_type_result_{timestamp}.xlsx"
-                result_path = os.path.join(download_dir, filename)
-                df_result.to_excel(result_path, index=False)
+                # Save result using utility
+                download_dir = os.path.join(Config.BASE_DIR, "output_lookup_last_type")
+                filename, result_path = FileUtils.save_result_file(df_result, download_dir, "last_type_result")
                 
                 download_link = url_for('download_file', func_name='lookup_last_type', filename=filename)
                 total_records = len(df_result)
@@ -234,7 +271,7 @@ def lookup_last_type_route():
                 
         except Exception as e:
             error_msg = str(e)
-            print(f"❌ Error details: {error_msg}")
+            logger.error(f"❌ Error details: {error_msg}")
             
             if "ไม่พบไฟล์ Last_Type.xlsx" in error_msg:
                 flash("ไม่พบไฟล์ Last_Type.xlsx กรุณาวางไฟล์ในโฟลเดอร์ Upload หรือ output_PNP_CHANG_TYPE", "error")
@@ -267,26 +304,26 @@ def internal_error(error):
 @app.errorhandler(Exception)
 def handle_exception(e):
     """Handle all other exceptions"""
-    print(f"Unhandled exception: {e}")
+    logger.error(f"Unhandled exception: {e}")
     flash("เกิดข้อผิดพลาดที่ไม่คาดคิด กรุณาลองใหม่อีกครั้ง", "error")
     return redirect(url_for("index"))
 
 if __name__ == "__main__":
     # Ensure output directories exist
-    os.makedirs(os.path.join(BASE_DIR, "output_lookup_last_type"), exist_ok=True)
-    os.makedirs(FUNCTIONS_DIR, exist_ok=True)
+    os.makedirs(os.path.join(Config.BASE_DIR, "output_lookup_last_type"), exist_ok=True)
+    os.makedirs(Config.FUNCTIONS_DIR, exist_ok=True)
     
     # Get local IP
     try:
         ip = socket.gethostbyname(socket.gethostname())
-        print(f"🚀 IE Function : Starting...")
-        print(f"   Local:   http://127.0.0.1:80")
-        print(f"   Network: http://{ip}:80")
-        print(f"   Debug:   {app.debug}")
-        print(f"   Functions: {list_functions()}")
+        logger.info("🚀 IE Function : Starting...")
+        logger.info(f"   Local:   http://127.0.0.1:{Config.PORT}")
+        logger.info(f"   Network: http://{ip}:{Config.PORT}")
+        logger.info(f"   Debug:   {Config.DEBUG}")
+        logger.info(f"   Functions: {list_functions()}")
     except Exception as e:
-        print(f"Network detection failed: {e}")
+        logger.error(f"Network detection failed: {e}")
         ip = "127.0.0.1"
     
     # Use port 80 
-    app.run(debug=True, host='0.0.0.0', port=80, threaded=True)
+    app.run(debug=Config.DEBUG, host=Config.HOST, port=Config.PORT, threaded=True)
