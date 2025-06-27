@@ -51,7 +51,7 @@ def index():
             download_link = url_for("download_file", func_name=func_name, filename=output_files[0])
 
             # เงื่อนไขแสดงผล
-            if show_table and func_name != "PNP_CHANG_TYPE":
+            if show_table :
                 if output_fp.endswith(".xlsx"):
                     df = pd.read_excel(output_fp)
                 else:

@@ -61,6 +61,9 @@ def run_all_years(input_path, output_dir):
 
     df_all = df_all[required_cols + ['file_year']]
 
+    # แปลง start_date เป็น datetime เพื่อเรียงตามวันที่
+    df_all['start_date'] = pd.to_datetime(df_all['start_date'], errors='coerce')
+
     # จัดเรียงเดือน
     month_order = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -68,53 +71,107 @@ def run_all_years(input_path, output_dir):
     df_all['month_short'] = df_all['month'].str[:3]
     df_all['month_num'] = df_all['month_short'].map(month_map)
 
-
-
-    # หา Type ล่าสุดสำหรับแต่ละกลุ่ม (ก่อนเรียงข้อมูล)
-    def get_latest_type(group):
-        # เรียงข้อมูลตามเวลาจากใหม่ไปเก่าเพื่อหา Type ล่าสุด
-        group_sorted = group.sort_values(
-            by=['file_year', 'month_num', 'start_date'], 
-            ascending=[False, False, False]
-        )
-        # เอา assy_pack_type แรก (ล่าสุด)
-        latest_type = group_sorted['assy_pack_type'].iloc[0]
-        return latest_type
-
-    # สร้าง mapping ของ Type ล่าสุดสำหรับแต่ละกลุ่ม
-    latest_types = df_all.groupby(['bom_no', 'package_code', 'product_no']).apply(get_latest_type)
-    latest_types_dict = latest_types.to_dict()
-
-    # เรียงข้อมูลตาม BOM → เวลา (จากเก่าไปใหม่)
+    # เรียงตาม BOM → เวลา (ปี → เดือน → วันที่)
     df_all = df_all.sort_values(by=[
-        'bom_no', 'package_code', 'product_no',
+        'bom_no', 'package_code', 'product_no', 'cust_code',
         'file_year', 'month_num', 'start_date'
     ]).reset_index(drop=True)
 
-    # เพิ่มคอลัมน์ Type สุดท้ายเข้าไปใน DataFrame
-    df_all['Last_type'] = df_all.apply(
-        lambda row: latest_types_dict[(row['bom_no'], row['package_code'], row['product_no'])], 
-        axis=1
-    )
-
-    # จัดรูปแบบวันที่ให้อ่านง่าย
-    df_all['start_date'] = pd.to_datetime(df_all['start_date'], errors='coerce').dt.strftime('%d/%m/%Y')\
-
-    # เตรียมข้อมูลสำหรับบันทึก (ลบคอลัมน์ที่ไม่จำเป็น)
-    df_to_save = df_all.drop(columns=['month', 'month_num',], errors='ignore')
-    df_to_save.rename(columns={'month_short': 'month'}, inplace=True)
-
-    # บันทึกผลลัพธ์
-    os.makedirs(output_dir, exist_ok=True)
-    output_file = os.path.join(output_dir, "Last_Type.xlsx")
-    df_to_save.to_excel(output_file, index=False)
-
-    print(f"✅ บันทึกไฟล์ข้อมูลทั้งหมดพร้อม Type สุดท้าย ไว้ที่: {output_file}")
-    print(f"📊 จำนวนแถวทั้งหมด: {len(df_to_save)}")
-    print(f"📈 จำนวนกลุ่ม BOM ที่ไม่ซ้ำ: {len(df_to_save.groupby(['bom_no', 'package_code', 'product_no']))}")
+    # จัดข้อมูลสำหรับแสดงผล: วิเคราะห์การเปลี่ยนแปลง assy_pack_type
+    group_cols = ['cust_code', 'package_code', 'product_no', 'bom_no']
     
-    return df_to_save
+    result_list = []
+    
+    for name, group in df_all.groupby(group_cols):
+        group = group.sort_values('start_date').reset_index(drop=True)
+        
+        # หาวันที่แรกสุดและวันที่ล่าสุดของ BOM นั้นๆ
+        first_record = group.iloc[0]   # record แรกสุด (วันที่เก่าสุด)
+        last_record = group.iloc[-1]   # record ล่าสุด (วันที่ใหม่สุด)
+        
+        # ตรวจสอบว่ามีการเปลี่ยนแปลง assy_pack_type หรือไม่
+        unique_types = group['assy_pack_type'].unique()
+        
+        if len(unique_types) == 1:
+            # ไม่มีการเปลี่ยนแปลง assy_pack_type
+            row_data = {
+                'cust_code': first_record['cust_code'],
+                'package_code': first_record['package_code'],
+                'product_no': first_record['product_no'],
+                'bom_no': first_record['bom_no'],
+                'prev_assy_pack_type': first_record['assy_pack_type'],
+                'assy_pack_type': first_record['assy_pack_type'],
+                'prev_start_date': first_record['start_date'],     # วันที่เจอครั้งแรก
+                'start_date': last_record['start_date'],           # วันที่เจอครั้งสุดท้าย
+                'prev_month_name': first_record['start_date'].strftime('%b'),
+                'curr_month_name': last_record['start_date'].strftime('%b'),
+                'change_status': 'No Change'
+            }
+            result_list.append(row_data)
+        else:
+            # มีการเปลี่ยนแปลง assy_pack_type
+            # หา assy_pack_type แรกและสุดท้าย
+            first_assy_type = first_record['assy_pack_type']
+            last_assy_type = last_record['assy_pack_type']
+            
+            row_data = {
+                'cust_code': first_record['cust_code'],
+                'package_code': first_record['package_code'],
+                'product_no': first_record['product_no'],
+                'bom_no': first_record['bom_no'],
+                'prev_assy_pack_type': first_assy_type,           # assy_pack_type แรก
+                'assy_pack_type': last_assy_type,                 # assy_pack_type สุดท้าย
+                'prev_start_date': first_record['start_date'],    # วันที่เจอครั้งแรก
+                'start_date': last_record['start_date'],          # วันที่เจอครั้งสุดท้าย
+                'prev_month_name': first_record['start_date'].strftime('%b'),
+                'curr_month_name': last_record['start_date'].strftime('%b'),
+                'change_status': 'Changed'
+            }
+            result_list.append(row_data)
+    
+    # สร้าง DataFrame จากผลลัพธ์
+    summary_df = pd.DataFrame(result_list)
+    
+    # เรียงเดือนให้ถูกต้องด้วย Categorical
+    month_order = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    summary_df['prev_month_name'] = pd.Categorical(summary_df['prev_month_name'], categories=month_order, ordered=True)
+    summary_df['curr_month_name'] = pd.Categorical(summary_df['curr_month_name'], categories=month_order, ordered=True)
 
+    # เรียงตามวันเวลา
+    summary_df = summary_df.sort_values(by=['start_date']).reset_index(drop=True)
+
+    # เลือกคอลัมน์ส่งออก
+    output_cols = group_cols + [
+        'prev_assy_pack_type', 'assy_pack_type',
+        'prev_start_date', 'start_date',
+        'prev_month_name', 'curr_month_name',
+        'change_status'
+    ]
+
+    # บันทึกผลลัพธ์ - ✅ เปลี่ยนชื่อไฟล์เป็น Last_Type.xlsx
+    os.makedirs(output_dir, exist_ok=True)
+    output_file = os.path.join(output_dir, "Last_Type.xlsx")  # ✅ เปลี่ยนชื่อไฟล์
+    
+    # ส่งออก Excel พร้อมจัดความกว้างคอลัมน์
+    with pd.ExcelWriter(output_file, engine='xlsxwriter') as writer:
+        summary_df[output_cols].to_excel(writer, index=False, sheet_name='BOM Summary')
+        worksheet = writer.sheets['BOM Summary']
+        worksheet.set_column('A:K', 15)
+    print(f"✅ Output file saved at: {output_file}")  # เพิ่มบรรทัดนี้
+
+    # นับข้อมูล
+    changed_count = len(summary_df[summary_df['change_status'] == 'Changed'])
+    no_change_count = len(summary_df[summary_df['change_status'] == 'No Change'])
+
+    print(f"✅ บันทึกไฟล์สรุปการเปลี่ยนแปลงไว้ที่: {output_file}")
+    print(f"📊 BOM ที่มีการเปลี่ยนแปลง: {changed_count} รายการ")
+    print(f"📋 BOM ที่ไม่มีการเปลี่ยนแปลง: {no_change_count} รายการ")
+    print(f"📈 รวมทั้งหมด: {len(summary_df)} รายการ")
+    
+    return summary_df
+
+# ✅ เก็บฟังก์ชัน lookup_last_type ไว้เพื่อใช้กับเว็บ
 def lookup_last_type(input_bom_file, output_dir):
     # โหลดไฟล์ Last_Type.xlsx
     last_type_path = os.path.join(output_dir, "Last_Type.xlsx")
@@ -123,9 +180,10 @@ def lookup_last_type(input_bom_file, output_dir):
         return
 
     df_last = pd.read_excel(last_type_path)
-    # เลือกเฉพาะคอลัมน์ที่จำเป็น
-    cols = ['bom_no', 'Last_type']
+    # เลือกเฉพาะคอลัมน์ที่จำเป็น - ✅ ปรับให้ใช้กับโครงสร้างใหม่
+    cols = ['bom_no', 'assy_pack_type']  # ใช้ assy_pack_type แทน Last_type
     df_last = df_last[cols].drop_duplicates()
+    df_last.rename(columns={'assy_pack_type': 'Last_type'}, inplace=True)  # เปลี่ยนชื่อคอลัมน์
 
     # โหลดไฟล์ bom_no ที่อัปโหลด
     df_bom = pd.read_excel(input_bom_file) if input_bom_file.endswith('.xlsx') else pd.read_csv(input_bom_file)
@@ -144,5 +202,9 @@ def lookup_last_type(input_bom_file, output_dir):
 def run(input_path, output_dir):
     return run_all_years(input_path, output_dir)
 
-
-
+# เรียกใช้งาน
+if __name__ == "__main__":
+    summary = run_all_years(
+        input_path="All Month",     # โฟลเดอร์ที่รวมไฟล์ปี 2023, 2024, 2025 ไว้หมด
+        output_dir="output_PNP_CHANG_TYPE"
+    )
