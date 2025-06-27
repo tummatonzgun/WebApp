@@ -141,8 +141,43 @@ def lookup_last_type(input_bom_file, output_dir):
     df_merged = pd.merge(df_bom, df_last, on=merge_cols, how='left')
     return df_merged
 
+
 def run(input_path, output_dir):
-    return run_all_years(input_path, output_dir)
+    """
+    Entry point สำหรับการรัน PNP_CHANG_TYPE
+    """
+    print(f"🚀 เริ่มต้น PNP_CHANG_TYPE")
+    
+    try:
+        # ตรวจสอบว่ามีไฟล์ WF size หรือไม่
+        wf_files = glob.glob(os.path.join(input_path, "WF size*"))
+        
+        if wf_files:
+            print(f"📁 พบไฟล์ WF size {len(wf_files)} ไฟล์")
+            # รันการสร้าง Last_Type.xlsx จากไฟล์ WF
+            df_result = run_all_years(input_path, output_dir)
+            return df_result
+        else:
+            # ถ้าเป็นการ lookup BOM
+            excel_files = glob.glob(os.path.join(input_path, "*.xlsx")) + glob.glob(os.path.join(input_path, "*.xls"))
+            
+            if excel_files:
+                print(f"📁 พบไฟล์ Excel {len(excel_files)} ไฟล์ - จะทำ lookup")
+                result_df = lookup_last_type(excel_files[0], output_dir)
+                
+                if result_df is not None:
+                    output_file = os.path.join(output_dir, "PNP_CHANG_TYPE_result.xlsx")
+                    result_df.to_excel(output_file, index=False)
+                    print(f"💾 บันทึกผลลัพธ์: {output_file}")
+                    
+                return result_df
+            else:
+                raise ValueError("ไม่พบไฟล์ WF size หรือไฟล์ Excel ที่สามารถประมวลผลได้")
+        
+    except Exception as e:
+        print(f"❌ Error in run: {e}")
+        raise e
+
 
 
 

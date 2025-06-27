@@ -4,7 +4,7 @@ import glob
 import numpy as np
 from pathlib import Path
 import time
-import uuid
+from datetime import datetime  
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -231,55 +231,79 @@ def process_single_file_complete(input_file: str, output_dir: str):
     input_path = Path(input_file)
     output_path = Path(output_dir)
     output_path.mkdir(exist_ok=True)
-    # สร้างชื่อไฟล์ใหม่แบบไม่ซ้ำ
-    unique_id = uuid.uuid4().hex
-    output_file = output_path / f"{input_path.stem}_{unique_id}.xlsx"
+    
+    # สร้างชื่อไฟล์ใหม่ด้วยวันที่และเวลา
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_file = output_path / f"{input_path.stem}_{timestamp}.xlsx"
+    
     try:
         df = load_and_parse_file(input_file)
         if df.empty:
             return False, f"ไม่สามารถโหลดข้อมูลจาก {input_file}"
+        
         df_pro = extract_pro_and_speed(df)
         if df_pro.empty:
             return False, f"ไม่พบข้อมูล PRO ในไฟล์ {input_file}"
+        
         df_pro = mark_errors(df, df_pro)
+        
+        # เลือกคอลัมน์ที่ต้องการ
         available_value_cols = [col for col in df_pro.columns if col.startswith('value_')]
         value_cols = available_value_cols[:1] if available_value_cols else []
         selected_cols = ['date', 'time', 'step', 'package', 'frame', 'No_strip'] + value_cols + ['speed','MC']
         existing_cols = [col for col in selected_cols if col in df_pro.columns]
         df_pro = df_pro[existing_cols]
+        
+        # ประมวลผลข้อมูล
         df_with_blank = insert_blank_rows(df_pro)
         df_time = calculate_time_diff(df_with_blank)
+        
+        # แปลงชนิดข้อมูล
         for col in ['frame', 'speed','value_1']:
             if col in df_time.columns:
                 if col == 'frame':
                     df_time[col] = df_time[col].astype(str).str.strip()
                 else:
                     df_time[col] = pd.to_numeric(df_time[col], errors='coerce')
+        
         if 'No_strip' in df_time.columns:
             df_time['No_strip'] = pd.to_numeric(df_time['No_strip'], errors='coerce')
+        
         df_filtered = df_time[df_time['frame'].notna()]
         if df_filtered.empty:
             return False, f"ไม่พบข้อมูล frame ที่ใช้งานได้ในไฟล์ {input_file}"
+        
+        # วิเคราะห์ข้อมูล
         df_analyzed = assign_subgroups_and_insert_empty_rows(df_filtered, 'No_strip', 'frame')
         df_analyzed = mark_outlier_subgroups(df_analyzed, 'subgroup_id', 'No_strip')
         df_analyzed = detect_outliers_combined(df_analyzed, 'frame', 'seconds', 'No_strip')
         df_analyzed = add_avg_exclude_outliers_by_frame(df_analyzed, value_col='seconds', group_col='frame')
+        
+        # จัดการ Error columns
         if 'outlier_subgroup' in df_analyzed.columns and 'is_outlier' in df_analyzed.columns and 'MC' in df_analyzed.columns:
             df_analyzed['Error'] = (df_analyzed['outlier_subgroup'] | df_analyzed['is_outlier'] | (df_analyzed['MC'] == 'MC error'))
         elif 'outlier_subgroup' in df_analyzed.columns and 'is_outlier' in df_analyzed.columns:
             df_analyzed['Error'] = df_analyzed['outlier_subgroup'] | df_analyzed['is_outlier']
         else:
             df_analyzed['Error'] = False
+        
+        # ลบคอลัมน์ที่ไม่ต้องการ
         df_analyzed.drop(columns=['outlier_subgroup', 'is_outlier','MC'], inplace=True, errors='ignore')
         df_analyzed['Error'] = df_analyzed['Error'].apply(lambda x: "MC ERROR" if x else "")
         df_analyzed.drop(columns=['subgroup_id'], inplace=True, errors='ignore')
         df_analyzed['sec/strip'] = df_analyzed['avg_ex_outliers']
+        
+        # สร้าง Summary
         summary = summarize_by_frame(df_analyzed)
         df_final = df_analyzed.drop(columns=['avg_ex_outliers'])
+        
+        # บันทึกไฟล์ Excel
         with pd.ExcelWriter(output_file) as writer:
             df_final.to_excel(writer, index=False, sheet_name='Processed_Data')
             summary.to_excel(writer, index=False, sheet_name='Summary')
+        
         return True, str(output_file)
+        
     except Exception as e:
         return False, f"เกิดข้อผิดพลาดในการประมวลผล {input_file}: {str(e)}"
 
@@ -426,24 +450,46 @@ def analyze_and_export_csv_from_df(summary_df, package_path, output_csv):
     print(f"✅ Exported summary CSV: {output_csv}")
 
 def run(input_path, output_dir):
+    """
+    ฟังก์ชันหลักสำหรับประมวลผลไฟล์ LOGVIEW
+    """
+    print(f"🚀 เริ่มประมวลผล LOGVIEW")
+    print(f"📁 Input: {input_path}")
+    print(f"📁 Output: {output_dir}")
+    
     # 1. ประมวลผลไฟล์ input และเก็บชื่อไฟล์ .xlsx ที่สร้างใหม่
     before_files = set(f for f in os.listdir(output_dir) if f.lower().endswith('.xlsx'))
+    
     process_multiple_files_complete(input_path, output_dir)
+    
     after_files = set(f for f in os.listdir(output_dir) if f.lower().endswith('.xlsx'))
     new_files = list(after_files - before_files)
+    
     if not new_files:
-        print("ไม่พบไฟล์ .xlsx ใหม่")
+        print("❌ ไม่พบไฟล์ .xlsx ใหม่")
         return
+
+    print(f"✅ สร้างไฟล์ใหม่ {len(new_files)} ไฟล์")
 
     # 2. ส่งเฉพาะไฟล์ใหม่ไปให้ summarize_sec_strip
     summary_df = summarize_sec_strip(output_dir, new_files)
+    
+    # 3. ตรวจสอบไฟล์ package
     package_path = os.path.join(BASE_DIR, "..", "Upload", "export package and frame stock Rev.02.xlsx")
     package_path = os.path.abspath(package_path)
+    
     if not os.path.exists(package_path):
-        print("ไม่พบไฟล์ export package and frame stock Rev.02.xlsx ใน Upload")
+        print("❌ ไม่พบไฟล์ export package and frame stock Rev.02.xlsx ใน Upload")
         return
-    output_csv = os.path.join(output_dir, "Summary.csv")
+    
+    # 4. สร้างไฟล์ Summary.csv ด้วย timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_csv = os.path.join(output_dir, f"Summary_{timestamp}.csv")
+    
     analyze_and_export_csv_from_df(summary_df, package_path, output_csv)
+    
+    print(f"🎉 ประมวลผลเสร็จสิ้น!")
+    print(f"📊 ไฟล์ผลลัพธ์: {output_csv}")
 
 
 
