@@ -41,11 +41,62 @@ class FileUtils:
         return True, None
     
     @staticmethod
+    def read_file_safely(file_path):
+        """Safely read Excel or CSV file with proper engine detection"""
+        try:
+            # ตรวจสอบนามสกุลไฟล์
+            file_ext = os.path.splitext(file_path)[1].lower()
+            
+            if file_ext in ['.xlsx', '.xls']:
+                # สำหรับไฟล์ Excel
+                try:
+                    # ลองใช้ openpyxl สำหรับ .xlsx
+                    if file_ext == '.xlsx':
+                        df = pd.read_excel(file_path, engine='openpyxl')
+                    else:
+                        # ลองใช้ xlrd สำหรับ .xls
+                        df = pd.read_excel(file_path, engine='xlrd')
+                    return df, None
+                except Exception as excel_error:
+                    # ถ้าอ่าน Excel ไม่ได้ ลองอ่านเป็น CSV
+                    try:
+                        df = pd.read_csv(file_path, encoding='utf-8')
+                        return df, "ไฟล์ถูกอ่านเป็น CSV format"
+                    except:
+                        try:
+                            df = pd.read_csv(file_path, encoding='tis-620')
+                            return df, "ไฟล์ถูกอ่านเป็น CSV format (TIS-620)"
+                        except:
+                            return None, f"ไม่สามารถอ่านไฟล์ได้: {str(excel_error)}"
+            
+            elif file_ext == '.csv':
+                # สำหรับไฟล์ CSV
+                try:
+                    df = pd.read_csv(file_path, encoding='utf-8')
+                    return df, None
+                except:
+                    try:
+                        df = pd.read_csv(file_path, encoding='tis-620')
+                        return df, "ไฟล์ถูกอ่านด้วย TIS-620 encoding"
+                    except:
+                        try:
+                            df = pd.read_csv(file_path, encoding='cp1252')
+                            return df, "ไฟล์ถูกอ่านด้วย CP1252 encoding"
+                        except Exception as csv_error:
+                            return None, f"ไม่สามารถอ่านไฟล์ CSV ได้: {str(csv_error)}"
+            
+            else:
+                return None, "รูปแบบไฟล์ไม่ถูกต้อง"
+                
+        except Exception as e:
+            return None, f"เกิดข้อผิดพลาดในการอ่านไฟล์: {str(e)}"
+    
+    @staticmethod
     def check_bom_column(df):
         """Check if DataFrame has BOM column"""
-        bom_columns = ['bom_no', 'bomno', 'bom no', 'bom_number']
+        bom_columns = ['bom_no', 'bomno', 'bom no', 'bom_number', 'BOM_NO', 'BOMNO']
         for col in df.columns:
-            if str(col).lower().strip() in bom_columns:
+            if str(col).lower().strip() in [bc.lower() for bc in bom_columns]:
                 return True, col
         return False, None
     
@@ -56,7 +107,15 @@ class FileUtils:
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"{prefix}_{timestamp}.xlsx"
         file_path = os.path.join(output_dir, filename)
-        df.to_excel(file_path, index=False)
+        
+        try:
+            df.to_excel(file_path, index=False, engine='openpyxl')
+        except:
+            # ถ้าเซฟ Excel ไม่ได้ เซฟเป็น CSV
+            filename = f"{prefix}_{timestamp}.csv"
+            file_path = os.path.join(output_dir, filename)
+            df.to_csv(file_path, index=False, encoding='utf-8-sig')
+            
         return filename, file_path
 
 def list_functions():
@@ -119,27 +178,36 @@ def index():
             # Handle table display
             if show_table:
                 try:
-                    if output_fp.endswith(".xlsx"):
-                        df = pd.read_excel(output_fp)
+                    # ใช้ read_file_safely แทน
+                    df, read_warning = FileUtils.read_file_safely(output_fp)
+                    
+                    if df is not None:
+                        if read_warning:
+                            flash(read_warning, "warning")
+                        
+                        # Add row numbers and format table
+                        df.index = range(1, len(df) + 1)
+                        table_html = df.to_html(
+                            classes="result-table table table-striped table-hover", 
+                            table_id="dataTable",
+                            index=True, 
+                            border=0,
+                            escape=False
+                        )
+                        
+                        flash("ประมวลผลสำเร็จ", "success")
+                        return render_template("result.html", 
+                                             table_html=table_html, 
+                                             download_link=download_link,
+                                             total_records=len(df),
+                                             func_name=func_name)
                     else:
-                        df = pd.read_csv(output_fp, encoding='utf-8')
-                    
-                    # Add row numbers and format table
-                    df.index = range(1, len(df) + 1)
-                    table_html = df.to_html(
-                        classes="result-table table table-striped table-hover", 
-                        table_id="dataTable",
-                        index=True, 
-                        border=0,
-                        escape=False
-                    )
-                    
-                    flash("ประมวลผลสำเร็จ", "success")
-                    return render_template("result.html", 
-                                         table_html=table_html, 
-                                         download_link=download_link,
-                                         total_records=len(df),
-                                         func_name=func_name)
+                        flash(f"ไม่สามารถแสดงตารางได้: {read_warning}", "warning")
+                        return render_template("result.html", 
+                                             table_html=None, 
+                                             download_link=download_link,
+                                             func_name=func_name)
+                        
                 except Exception as e:
                     logger.error(f"Error displaying table: {e}")
                     flash(f"ไม่สามารถแสดงตารางได้: {str(e)}", "warning")
@@ -201,7 +269,6 @@ def lookup_last_type_route():
         # Debug: ตรวจสอบข้อมูลที่ส่งมา
         logger.info(f"📨 Form data: {request.form}")
         logger.info(f"📁 Files: {request.files}")
-        logger.info(f"📋 Files keys: {list(request.files.keys())}")
         
         file = request.files.get("file")
         logger.info(f"🔍 File object: {file}")
@@ -219,22 +286,30 @@ def lookup_last_type_route():
         try:
             # บันทึกไฟล์ก่อน
             file.save(file_path)
+            logger.info(f"💾 บันทึกไฟล์แล้ว: {file_path}")
             
             # ตรวจสอบไฟล์หลังบันทึกแล้ว
-            try:
-                temp_df = pd.read_excel(file_path)
-                logger.info(f"📋 ไฟล์ที่อัปโหลดมีคอลัมน์: {list(temp_df.columns)}")
-                
-                # ตรวจสอบคอลัมน์ bom_no ด้วย utility
-                has_bom, bom_col = FileUtils.check_bom_column(temp_df)
-                if not has_bom:
-                    available_cols = ", ".join(str(col) for col in temp_df.columns)
-                    flash(f"ไฟล์ไม่มีคอลัมน์ bom_no - คอลัมน์ที่มี: {available_cols}", "error")
-                    return redirect(url_for("lookup_last_type_route"))
-                    
-            except Exception as read_error:
-                flash(f"ไม่สามารถอ่านไฟล์ Excel ได้: {str(read_error)}", "error")
+            temp_df, read_warning = FileUtils.read_file_safely(file_path)
+            
+            if temp_df is None:
+                flash(f"ไม่สามารถอ่านไฟล์ได้: {read_warning}", "error")
                 return redirect(url_for("lookup_last_type_route"))
+            
+            # แสดง warning ถ้ามี
+            if read_warning:
+                flash(read_warning, "warning")
+            
+            logger.info(f"📋 ไฟล์ที่อัปโหลดมีคอลัมน์: {list(temp_df.columns)}")
+            logger.info(f"📊 จำนวนแถว: {len(temp_df)}")
+            
+            # ตรวจสอบคอลัมน์ bom_no ด้วย utility
+            has_bom, bom_col = FileUtils.check_bom_column(temp_df)
+            if not has_bom:
+                available_cols = ", ".join(str(col) for col in temp_df.columns)
+                flash(f"ไฟล์ไม่มีคอลัมน์ bom_no - คอลัมน์ที่มี: {available_cols}", "error")
+                return redirect(url_for("lookup_last_type_route"))
+            
+            logger.info(f"✅ พบคอลัมน์ BOM: {bom_col}")
             
             # ดำเนินการ lookup
             output_dir = os.path.join(Config.BASE_DIR, "output_PNP_CHANG_TYPE")
