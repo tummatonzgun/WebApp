@@ -403,4 +403,4 @@ if __name__ == "__main__":
     # Use port 80 
     app.run(debug=Config.DEBUG, host=Config.HOST, port=Config.PORT, threaded=True)
 
-#version 2
+#version 2.0
