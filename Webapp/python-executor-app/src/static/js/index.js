@@ -55,6 +55,25 @@ document.addEventListener('DOMContentLoaded', function() {
         if (elements.showTableCheckbox) {
             elements.showTableCheckbox.addEventListener('change', saveFormState);
         }
+
+        // จัดการการคลิกปุ่ม operation
+        document.querySelectorAll('.operation-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const operation = this.dataset.operation;
+                
+                // ลบ active class จากปุ่มอื่น
+                document.querySelectorAll('.operation-btn').forEach(b => b.classList.remove('active'));
+                
+                // เพิ่ม active class ให้ปุ่มที่เลือก
+                this.classList.add('active');
+                
+                // อัปเดต hidden input
+                document.getElementById('selectedOperation').value = operation;
+                
+                // อัปเดต function select
+                updateFunctionSelect(operation);
+            });
+        });
     }
 
     function handleFormSubmit(e) {
@@ -344,63 +363,125 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Utility functions
-    function formatFileSize(bytes) {
-        if (bytes === 0) return '0 Bytes';
-        const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    }
+    // ข้อมูลคำแนะนำไฟล์สำหรับแต่ละฟังก์ชัน
+    const fileGuidanceData = {
+        "Singulation": {
+            "LOGVIEW": {
+                acceptedFiles: ["TXT","txt"],
+                description: "ไฟล์ข้อมูล Singulatio ",
+                example: " MC 12 .txt"
+            },
+            "singulation_report": {
+                acceptedFiles: ["Excel (.xlsx, .xls)"],
+                description: "ไฟล์ข้อมูล Singulation เพื่อสร้างรายงาน",
+                example: "ตัวอย่าง: singulation_summary.xlsx"
+            }
+        },
+        "Pick & Place": {
+            "PNP_CHANG_TYPE": {
+                acceptedFiles: ["Excel (.xlsx, .xls)", "CSV (.csv)"],
+                description: "ไฟล์ข้อมูล Pick & Place ที่มีคอลั่ม assy_pack_type, bom_no ของแต่ละเดือน",
+                example: "ตัวอย่าง: WF size Apr1-Apr30'23 (UTL1), WF size Aug1-Aug31'23 (UTL1)"
+            },
+            "pnp_validation": {
+                acceptedFiles: ["Excel (.xlsx, .xls)"],
+                description: "ไฟล์เพื่อตรวจสอบความถูกต้องของ Pick & Place",
+                example: "ตัวอย่าง: pnp_validation.xlsx"
+            }
+        },
+        "DA": {
+            "data_analysis": {
+                acceptedFiles: ["Excel (.xlsx, .xls)", "CSV (.csv)"],
+                description: "ไฟล์ข้อมูลใดๆ ที่ต้องการวิเคราะห์ทางสtatistical",
+                example: "ตัวอย่าง: production_data.xlsx, quality_data.csv"
+            },
+            "trend_analysis": {
+                acceptedFiles: ["Excel (.xlsx, .xls)", "CSV (.csv)"],
+                description: "ไฟล์ข้อมูลที่มี timestamp หรือ sequence สำหรับวิเคราะห์แนวโน้ม",
+                example: "ตัวอย่าง: trend_data.xlsx"
+            }
+        },
+        "WB": {
+            "lookup_last_type": {
+                acceptedFiles: ["Excel (.xlsx, .xls)"],
+                description: "ไฟล์ BOM ที่มีคอลัมน์ Part Number และ Last Type",
+                example: "ตัวอย่าง: BOM_list.xlsx"
+            },
+            "validate_bom": {
+                acceptedFiles: ["Excel (.xlsx, .xls)"],
+                description: "ไฟล์ BOM เพื่อตรวจสอบความครบถ้วนและถูกต้อง",
+                example: "ตัวอย่าง: BOM_validation.xlsx"
+            }
+        }
+    };
 
-    function getFileIcon(filename) {
-        const ext = filename.split('.').pop().toLowerCase();
-        const iconMap = {
-            'xlsx': 'fas fa-file-excel',
-            'xls': 'fas fa-file-excel',
-            'csv': 'fas fa-file-csv',
-            'txt': 'fas fa-file-alt'
-        };
-        return iconMap[ext] || 'fas fa-file';
-    }
+    // เพิ่มการจัดการเมื่อเลือกฟังก์ชัน
+    document.getElementById('funcSelect').addEventListener('change', function() {
+        const selectedFunction = this.value;
+        const selectedOperation = document.getElementById('selectedOperation').value;
+        const guidanceDiv = document.getElementById('fileGuidance');
+        const guidanceContent = document.getElementById('guidanceContent');
+        
+        if (selectedFunction && selectedOperation && fileGuidanceData[selectedOperation] && fileGuidanceData[selectedOperation][selectedFunction]) {
+            const guidance = fileGuidanceData[selectedOperation][selectedFunction];
+            
+            guidanceContent.innerHTML = `
+                <div class="file-types">
+                    <strong>ประเภทไฟล์ที่รองรับ:</strong>
+                    <ul class="file-list">
+                        ${guidance.acceptedFiles.map(file => `<li>${file}</li>`).join('')}
+                    </ul>
+                </div>
+                <div class="description">
+                    <strong>คำอธิบาย:</strong> ${guidance.description}
+                </div>
+                <div class="example-section">
+                    <strong>ตัวอย่าง:</strong> ${guidance.example}
+                </div>
+            `;
+            
+            guidanceDiv.style.display = 'block';
+        } else {
+            guidanceDiv.style.display = 'none';
+        }
+    });
 
-    function showMessage(message, type = 'info') {
-        console.log(`[${type.toUpperCase()}] ${message}`);
+    function updateFunctionSelect(selectedOperation) {
+        const funcSelect = document.getElementById('funcSelect');
+        const guidanceDiv = document.getElementById('fileGuidance');
         
-        // Create simple alert message
-        const alertDiv = document.createElement('div');
-        alertDiv.className = `alert alert-${type}`;
-        alertDiv.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 1000;
-            padding: 15px 20px;
-            border-radius: 8px;
-            color: white;
-            font-weight: 500;
-            max-width: 400px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        `;
+        // ซ่อนคำแนะนำเมื่อเปลี่ยน operation
+        guidanceDiv.style.display = 'none';
         
-        // Set background color based on type
-        const colors = {
-            'info': '#17a2b8',
-            'success': '#28a745',
-            'error': '#dc3545',
-            'warning': '#ffc107'
-        };
-        alertDiv.style.background = colors[type] || colors['info'];
+        // ล้างตัวเลือกฟังก์ชัน
+        funcSelect.innerHTML = '<option value="">-- กรุณาเลือกฟังก์ชัน --</option>';
         
-        alertDiv.innerHTML = `<i class="fas fa-info-circle" style="margin-right: 8px;"></i>${message}`;
-        
-        document.body.appendChild(alertDiv);
-        
-        // Auto remove after 4 seconds
-        setTimeout(() => {
-            alertDiv.style.opacity = '0';
-            setTimeout(() => alertDiv.remove(), 300);
-        }, 4000);
+        if (selectedOperation) {
+            // เปิดใช้งาน function select
+            funcSelect.disabled = false;
+            
+            // ข้อมูล operation-function mapping
+            const operationFunctions = {
+                "Singulation": ["LOGVIEW",],
+                "Pick & Place": ["PNP_CHANG_TYPE",],
+                "DA": [""],
+                "WB": [""]
+            };
+            
+            // เพิ่มฟังก์ชันที่เกี่ยวข้องกับ operation ที่เลือก
+            if (operationFunctions[selectedOperation]) {
+                operationFunctions[selectedOperation].forEach(func => {
+                    const option = document.createElement('option');
+                    option.value = func;
+                    option.textContent = func;
+                    funcSelect.appendChild(option);
+                });
+            }
+        } else {
+            // ปิดใช้งาน function select
+            funcSelect.disabled = true;
+            funcSelect.innerHTML = '<option value="">-- กรุณาเลือก Operation ก่อน --</option>';
+        }
     }
 
     // Global functions for HTML onclick events

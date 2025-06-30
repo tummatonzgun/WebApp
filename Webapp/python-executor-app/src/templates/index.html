@@ -28,15 +28,51 @@
         <div class="form-container">
             <form method="post" enctype="multipart/form-data" id="mainForm">
                 <div class="form-group">
+                    <label class="section-label">
+                        <i class="fas fa-tasks"></i>เลือก Operation:
+                    </label>
+                    <div class="operation-buttons">
+                        <button type="button" class="operation-btn" data-operation="Singulation">
+                            <i class="fas fa-database"></i>
+                            <span>Singulation</span>
+                        </button>
+                        <button type="button" class="operation-btn" data-operation="Pick & Place">
+                            <i class="fas fa-file-alt"></i>
+                            <span>Pick & Places</span>
+                        </button>
+                        <button type="button" class="operation-btn" data-operation="DA">
+                            <i class="fas fa-chart-line"></i>
+                            <span>DA</span>
+                        </button>
+                        <button type="button" class="operation-btn" data-operation="WB">
+                            <i class="fas fa-list-ul"></i>
+                            <span>WB</span>
+                        </button>
+                    </div>
+                    <input type="hidden" name="operation" id="selectedOperation" required>
+                </div>
+
+                <div class="form-group">
                     <label for="funcSelect">
                         <i class="fas fa-function"></i>เลือกฟังก์ชัน:
                     </label>
-                    <select name="func_name" id="funcSelect" class="form-control" required>
-                        <option value="">-- กรุณาเลือกฟังก์ชัน --</option>
+                    <select name="func_name" id="funcSelect" class="form-control" required disabled>
+                        <option value="">-- กรุณาเลือก Operation ก่อน --</option>
                         {% for func in functions %}
                         <option value="{{ func }}">{{ func }}</option>
                         {% endfor %}
                     </select>
+                    
+                    <!-- คำแนะนำไฟล์ -->
+                    <div id="fileGuidance" class="file-guidance" style="display:none;">
+                        <div class="guidance-header">
+                            <i class="fas fa-info-circle"></i>
+                            <span>คำแนะนำไฟล์สำหรับฟังก์ชันที่เลือก</span>
+                        </div>
+                        <div id="guidanceContent" class="guidance-content">
+                            <!-- เนื้อหาจะถูกเพิ่มด้วย JavaScript -->
+                        </div>
+                    </div>
                 </div>
 
                 <div class="form-group">

@@ -388,12 +388,12 @@ def filtered_mean(lst):
         return float('nan')
     return sum(filtered) / len(filtered)
 
-# กำหนด mapping เงื่อนไข Package group → Lead frame, SPEED ไม่ควรน้อยกว่า3 เขียนยังไง
-# ตัวอย่างการกำหนด mapping ตามที่ให้มา
+# กำหนด mapping เงื่อนไข Package group → Lead frame
 MAPPING = {
-    ('QFN', '<=5'): 'CU',
-    ('QFN', '<=4'): 'PPF',
+    ('QFN', '5.0'): 'CU',
+    ('QFN', '4.0'): 'PPF',
 }
+
 def analyze_and_export_csv(summary_path, package_path, output_csv):
     df = pd.read_excel(summary_path)
     df2 = pd.read_excel(package_path)
@@ -408,6 +408,7 @@ def analyze_and_export_csv(summary_path, package_path, output_csv):
     df = df.drop(columns='FRAME_STOCK')
     df['TIME/STRIP'] = df['TIME/STRIP'].round(2)
     df.rename(columns={'X': 'FRAME_STOCK'}, inplace=True)
+    df.rename(columns={'SPEED': 'SPEED (IPS)'},inplace=True)
     df_merged = pd.merge(df, df2[['FRAME_STOCK', 'PACKAGE_CODE']], on='FRAME_STOCK', how='left')
     df_merged.to_csv(output_csv, index=False)
     print(f"✅ Exported summary CSV: {output_csv}")
@@ -423,9 +424,9 @@ def analyze_and_export_csv_from_df(summary_df, package_path, output_csv):
     df = df[['FRAME_STOCK', 'non_null_values']]
     df['TIME/STRIP'] = df['non_null_values'].apply(filtered_mean)
     df = df[['FRAME_STOCK', 'TIME/STRIP']]
-    df['SPEED'] = df['FRAME_STOCK'].astype(str).str[-3:]
+    df['SPEED (IPS)'] = df['FRAME_STOCK'].astype(str).str[-3:]
     df['X'] = df['FRAME_STOCK'].astype(str).str[0:6]
-    df = df[['X', 'SPEED', 'TIME/STRIP', 'FRAME_STOCK']]
+    df = df[['X', 'SPEED (IPS)', 'TIME/STRIP', 'FRAME_STOCK']]
     df = df.drop(columns='FRAME_STOCK')
     df['TIME/STRIP'] = df['TIME/STRIP'].round(2)
     df.rename(columns={'X': 'FRAME_STOCK'}, inplace=True)
@@ -435,16 +436,26 @@ def analyze_and_export_csv_from_df(summary_df, package_path, output_csv):
         on='FRAME_STOCK',
         how='left'
     )
-
-    # เติมข้อมูล Package group ตาม SPEED ที่กำหนดไว้
-    df_merged['SPEED'] = df_merged.apply(
-        lambda row: MAPPING.get((str(row['Package group']), row['SPEED']), row['SPEED']),
-        axis=1
-    )
+    # แก้ไขการใช้ MAPPING
     df_merged['Lead frame'] = df_merged.apply(
-        lambda row: MAPPING.get((str(row['Package group']), row['SPEED']), row['Lead frame']),
+        lambda row: MAPPING.get((str(row['Package group']), str(row['SPEED (IPS)'])), row['Lead frame']),
         axis=1
     )
+    
+    df_merged['Process'] = None
+    df_merged['Package group'] = df_merged['Package group'].astype(str).str.strip().str.upper()
+    # แปลง SPEED ให้เป็นตัวเลข
+    df_merged['SPEED (IPS)'] = pd.to_numeric(df_merged['SPEED (IPS)'], errors='coerce')
+
+    # สร้างคอลัมน์ Process ด้วยเงื่อนไข
+    choices = [
+       (df_merged['SPEED (IPS)'] == 5) & (df_merged['Package group'] == 'SLP'),
+       (df_merged['SPEED (IPS)'] == 3) & (df_merged['Package group'] == 'SLP')
+    ]
+
+    answer = ['Full Cut', 'Step Cut']
+
+    df_merged['Process'] = np.select(choices, answer, default=None)
 
     df_merged.to_csv(output_csv, index=False)
     print(f"✅ Exported summary CSV: {output_csv}")
