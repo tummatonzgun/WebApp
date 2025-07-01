@@ -414,11 +414,22 @@ def analyze_and_export_csv(summary_path, package_path, output_csv):
     print(f"✅ Exported summary CSV: {output_csv}")
 
 def analyze_and_export_csv_from_df(summary_df, package_path, output_csv):
+    """
+    วิเคราะห์และส่งออกข้อมูลเป็นไฟล์ CSV
+    """
+    print("📊 เริ่มวิเคราะห์และส่งออก CSV...")
+    
     df = summary_df.reset_index()
     # ตรวจสอบและเปลี่ยนชื่อคอลัมน์ index ให้เป็น 'FRAME_STOCK'
     if df.columns[0] != 'FRAME_STOCK':
         df = df.rename(columns={df.columns[0]: 'FRAME_STOCK'})
+    
+    # โหลดข้อมูล package
+    print(f"📁 โหลดข้อมูล package จาก: {package_path}")
     df2 = pd.read_excel(package_path)
+    
+    # ประมวลผลข้อมูล
+    print("🔄 กำลังประมวลผลข้อมูล...")
     df['non_null_values'] = df.loc[:, df.columns != 'FRAME_STOCK'].apply(
         lambda row: row.dropna().tolist(), axis=1)
     df = df[['FRAME_STOCK', 'non_null_values']]
@@ -430,18 +441,25 @@ def analyze_and_export_csv_from_df(summary_df, package_path, output_csv):
     df = df.drop(columns='FRAME_STOCK')
     df['TIME/STRIP'] = df['TIME/STRIP'].round(2)
     df.rename(columns={'X': 'FRAME_STOCK'}, inplace=True)
+    
+    # Merge กับข้อมูล package
+    print("🔗 รวมข้อมูลกับ package data...")
     df_merged = pd.merge(
         df,
         df2[['FRAME_STOCK', 'PACKAGE_CODE','Package size ','Package group','Lead frame','Unit/strip','Strip/lot']],
         on='FRAME_STOCK',
         how='left'
     )
+    
     # แก้ไขการใช้ MAPPING
+    print("🔧 ปรับปรุง Lead frame ตาม mapping...")
     df_merged['Lead frame'] = df_merged.apply(
         lambda row: MAPPING.get((str(row['Package group']), str(row['SPEED (IPS)'])), row['Lead frame']),
         axis=1
     )
     
+    # สร้างคอลัมน์ Process
+    print("⚙️ กำหนด Process...")
     df_merged['Process'] = None
     df_merged['Package group'] = df_merged['Package group'].astype(str).str.strip().str.upper()
     # แปลง SPEED ให้เป็นตัวเลข
@@ -452,13 +470,163 @@ def analyze_and_export_csv_from_df(summary_df, package_path, output_csv):
        (df_merged['SPEED (IPS)'] == 5) & (df_merged['Package group'] == 'SLP'),
        (df_merged['SPEED (IPS)'] == 3) & (df_merged['Package group'] == 'SLP')
     ]
-
     answer = ['Full Cut', 'Step Cut']
-
     df_merged['Process'] = np.select(choices, answer, default=None)
-
-    df_merged.to_csv(output_csv, index=False)
+    
+    # ✅ ขั้นตอนสุดท้าย: เรียกใช้ group_and_average_across_frames_unique_frame
+    print("🎯 ขั้นตอนสุดท้าย: การจัดกลุ่มและคำนวณค่าเฉลี่ยข้าม frame...")
+    df_final = group_and_average_across_frames_unique_frame(df_merged)
+    
+    # บันทึกไฟล์ CSV
+    print(f"💾 บันทึกไฟล์ CSV: {output_csv}")
+    df_final.to_csv(output_csv, index=False)
     print(f"✅ Exported summary CSV: {output_csv}")
+    
+    return df_final
+
+def group_and_average_across_frames_unique_frame(df_merged):
+    """
+    จัดกลุ่มและคำนวณค่าเฉลี่ยข้าม frame - ฟังก์ชันขั้นตอนสุดท้าย
+    """
+    print("🔄 กำลังจัดกลุ่มและคำนวณค่าเฉลี่ย...")
+    
+    grouping_cols = [
+        'Package size ',
+        'Package group',
+        'Lead frame',
+        'Unit/strip',
+        'SPEED (IPS)'
+    ]
+    
+    # ตรวจสอบว่ามีคอลัมน์ที่จำเป็นหรือไม่
+    missing_cols = [col for col in grouping_cols if col not in df_merged.columns]
+    if missing_cols:
+        print(f"⚠️  ไม่พบคอลัมน์: {missing_cols}")
+        return df_merged
+    
+    print(f"📊 ข้อมูลเริ่มต้น: {df_merged.shape[0]} แถว")
+    
+    # ลบข้อมูลที่ซ้ำกันตาม FRAME_STOCK
+    df_unique = df_merged.drop_duplicates(subset=['FRAME_STOCK'])
+    print(f"📊 ข้อมูลหลังลบ duplicate: {df_unique.shape[0]} แถว")
+    
+    group_avg_map = {}
+    # ✅ เพิ่ม dictionary สำหรับเก็บข้อมูลก่อนและหลังตัดแยกกัน
+    group_before_map = {}  # จำนวนก่อนตัด
+    group_after_map = {}   # จำนวนหลังตัด
+    total_groups = 0
+    processed_groups = 0
+    total_outliers_removed = 0
+
+    print("🔍 วิเคราะห์กลุ่มข้อมูล...")
+    print("=" * 80)
+    
+    for group_key, group_df in df_unique.groupby(grouping_cols):
+        total_groups += 1
+        values = group_df['TIME/STRIP'].dropna().tolist()
+        
+        # สร้างชื่อกลุ่มที่อ่านง่าย
+        group_name = f"{group_key[0]} | {group_key[1]} | {group_key[2]} | Speed:{group_key[4]}"
+        
+        if len(values) < 2:
+            print(f"❌ กลุ่ม: {group_name}")
+            print(f"   📊 ข้อมูลไม่เพียงพอ: {len(values)} ค่า (ต้องการอย่างน้อย 2 ค่า)")
+            print(f"   📋 ค่าที่มี: {values}")
+            
+            # ✅ เก็บข้อมูลจำนวนแม้ไม่ผ่าน
+            group_before_map[group_key] = len(values)
+            group_after_map[group_key] = 0
+            print()
+            continue
+            
+        # กรองข้อมูล outliers
+        q1 = np.percentile(values, 25)
+        q3 = np.percentile(values, 75)
+        iqr = q3 - q1
+        lower = q1 - 1.5 * iqr
+        upper = q3 + 1.5 * iqr
+        
+        # แยกข้อมูลที่ผ่านและไม่ผ่านการกรอง
+        filtered = [v for v in values if lower <= v <= upper]
+        outliers = [v for v in values if v < lower or v > upper]
+        
+        # ✅ เก็บจำนวนก่อนและหลังตัดแยกกัน
+        group_before_map[group_key] = len(values)
+        group_after_map[group_key] = len(filtered)
+        
+        if filtered:
+            avg_val = round(np.mean(filtered), 2)
+            group_avg_map[group_key] = avg_val
+            processed_groups += 1
+            total_outliers_removed += len(outliers)
+            
+            print(f"✅ กลุ่ม: {group_name}")
+            print(f"   📊 ข้อมูลทั้งหมด: {len(values)} ค่า")
+            print(f"   📈 ช่วงปกติ: {round(lower, 2)} - {round(upper, 2)}")
+            print(f"   ✅ ข้อมูลที่ใช้: {len(filtered)} ค่า → {filtered}")
+            
+            if outliers:
+                print(f"   ❌ Outliers ที่ตัดออก: {len(outliers)} ค่า → {outliers}")
+                print(f"   📊 เปอร์เซ็นต์ที่ตัด: {round(len(outliers)/len(values)*100, 1)}%")
+            else:
+                print(f"   ✨ ไม่มี outliers (ข้อมูลทั้งหมดอยู่ในช่วงปกติ)")
+                
+            print(f"   🎯 ค่าเฉลี่ยสุดท้าย: {avg_val}")
+            print(f"   📊 จำนวน: {len(values)}/{len(filtered)} (ก่อนตัด/หลังตัด)")
+            print()
+        else:
+            print(f"⚠️  กลุ่ม: {group_name}")
+            print(f"   📊 ข้อมูลทั้งหมด: {len(values)} ค่า → {values}")
+            print(f"   ❌ ไม่มีข้อมูลหลังกรองทั้งหมด (ทุกค่าเป็น outliers)")
+            print(f"   📈 ช่วงปกติ: {round(lower, 2)} - {round(upper, 2)}")
+            print(f"   📊 จำนวน: {len(values)}/0 (ก่อนตัด/หลังตัด)")
+            print()
+
+    print("=" * 80)
+    print(f"📈 สรุปการประมวลผล:")
+    print(f"   🔢 กลุ่มทั้งหมด: {total_groups} กลุ่ม")
+    print(f"   ✅ กลุ่มที่ประมวลผลได้: {processed_groups} กลุ่ม")
+    print(f"   ❌ กลุ่มที่ข้ามไป: {total_groups - processed_groups} กลุ่ม")
+    print(f"   🗑️  Outliers ที่ตัดออกทั้งหมด: {total_outliers_removed} ค่า")
+    print(f"   📊 อัตราสำเร็จ: {round(processed_groups/total_groups*100, 1)}%")
+    print("=" * 80)
+
+    # ✅ ฟังก์ชันสำหรับกำหนดจำนวนก่อนตัด
+    def assign_before_count(row):
+        key = tuple(row[col] for col in grouping_cols)
+        return group_before_map.get(key, 0)
+
+    # ✅ ฟังก์ชันสำหรับกำหนดจำนวนหลังตัด
+    def assign_after_count(row):
+        key = tuple(row[col] for col in grouping_cols)
+        return group_after_map.get(key, 0)
+
+    # ✅ ฟังก์ชันสำหรับกำหนดค่าเฉลี่ย
+    def assign_avg(row):
+        key = tuple(row[col] for col in grouping_cols)
+        original_value = row['TIME/STRIP']
+        new_value = group_avg_map.get(key, original_value)
+        
+        # แสดงการเปลี่ยนแปลงถ้ามี
+        if pd.notna(original_value) and pd.notna(new_value) and abs(original_value - new_value) > 0.01:
+            change_type = "📈" if new_value > original_value else "📉"
+            diff = abs(new_value - original_value)
+            before_count = group_before_map.get(key, 0)
+            after_count = group_after_map.get(key, 0)
+            print(f"   {change_type} {row['FRAME_STOCK']}: {original_value} → {new_value} (เปลี่ยน {round(diff, 2)}) [{before_count}/{after_count}]")
+            
+        return new_value
+
+    print("🔄 กำลังอัปเดตค่า TIME/STRIP...")
+    df_merged['TIME/STRIP'] = df_merged.apply(assign_avg, axis=1)
+    
+    # ✅ เพิ่มคอลัมน์ใหม่: แยกกันเป็น 2 คอลัมน์
+    print("📊 เพิ่มคอลัมน์จำนวนข้อมูลก่อนและหลังตัด...")
+    df_merged['Data_Before_Filter'] = df_merged.apply(assign_before_count, axis=1)
+    df_merged['Data_After_Filter'] = df_merged.apply(assign_after_count, axis=1)
+    
+    print("✅ เสร็จสิ้นการจัดกลุ่มและคำนวณค่าเฉลี่ย")
+    return df_merged
 
 def run(input_path, output_dir):
     """
@@ -469,6 +637,7 @@ def run(input_path, output_dir):
     print(f"📁 Output: {output_dir}")
     
     # 1. ประมวลผลไฟล์ input และเก็บชื่อไฟล์ .xlsx ที่สร้างใหม่
+    print("📊 ขั้นตอนที่ 1: ประมวลผลไฟล์ input...")
     before_files = set(f for f in os.listdir(output_dir) if f.lower().endswith('.xlsx'))
     
     process_multiple_files_complete(input_path, output_dir)
@@ -482,10 +651,13 @@ def run(input_path, output_dir):
 
     print(f"✅ สร้างไฟล์ใหม่ {len(new_files)} ไฟล์")
 
-    # 2. ส่งเฉพาะไฟล์ใหม่ไปให้ summarize_sec_strip
+    # 2. สร้าง summary DataFrame
+    print("📊 ขั้นตอนที่ 2: สร้าง summary...")
     summary_df = summarize_sec_strip(output_dir, new_files)
+    print(f"📊 ข้อมูล summary: {summary_df.shape}")
     
     # 3. ตรวจสอบไฟล์ package
+    print("📊 ขั้นตอนที่ 3: ตรวจสอบไฟล์ package...")
     package_path = os.path.join(BASE_DIR, "..", "Upload", "export package and frame stock Rev.02.xlsx")
     package_path = os.path.abspath(package_path)
     
@@ -494,47 +666,17 @@ def run(input_path, output_dir):
         return
     
     # 4. สร้างไฟล์ Summary.csv ด้วย timestamp
+    print("📊 ขั้นตอนที่ 4: สร้างไฟล์ CSV สุดท้าย...")
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_csv = os.path.join(output_dir, f"Summary_{timestamp}.csv")
     
-    analyze_and_export_csv_from_df(summary_df, package_path, output_csv)
+    # ✅ ฟังก์ชันนี้จะเรียกใช้ group_and_average_across_frames_unique_frame ในขั้นตอนสุดท้าย
+    final_df = analyze_and_export_csv_from_df(summary_df, package_path, output_csv)
     
     print(f"🎉 ประมวลผลเสร็จสิ้น!")
     print(f"📊 ไฟล์ผลลัพธ์: {output_csv}")
+    print(f"📈 ข้อมูลสุดท้าย: {final_df.shape[0]} แถว")
 
-def group_and_average_across_frames_unique_frame(df):
-    grouping_cols = [
-        'Package size ',
-        'Package group',
-        'Lead frame',
-        'Unit/strip',
-        'SPEED (IPS)'
-    ]
-    
-    df_unique = df.drop_duplicates(subset=['FRAME_STOCK'])
-    group_avg_map = {}
 
-    for group_key, group_df in df_unique.groupby(grouping_cols):
-        values = group_df['TIME/STRIP'].dropna().tolist()
-        print(f"Group: {group_key}, Values Count: {len(values)}")  # debug
-        if len(values) < 2:
-            continue
-        q1 = np.percentile(values, 25)
-        q3 = np.percentile(values, 75)
-        iqr = q3 - q1
-        lower = q1 - 1.5 * iqr
-        upper = q3 + 1.5 * iqr
-        filtered = [v for v in values if lower <= v <= upper]
-        print(f"Filtered Values Count: {len(filtered)}")  # debug
-        if filtered:
-            avg_val = round(np.mean(filtered), 2)
-            group_avg_map[group_key] = avg_val
-
-    def assign_avg(row):
-        key = tuple(row[col] for col in grouping_cols)
-        return group_avg_map.get(key, row['TIME/STRIP'])
-
-    df['TIME/STRIP'] = df.apply(assign_avg, axis=1)
-    return df
 
 
