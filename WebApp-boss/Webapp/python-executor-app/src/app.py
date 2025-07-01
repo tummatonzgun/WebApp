@@ -176,23 +176,27 @@ def index():
             download_link = url_for("download_file", func_name=func_name, filename=output_files[0])
 
             # Handle table display
+            # ===== การแสดงผลตาราง =====
             if show_table:
                 try:
-                    # ใช้ read_file_safely แทน
+                    # อ่านไฟล์ผลลัพธ์เพื่อแสดงเป็นตาราง
                     df, read_warning = FileUtils.read_file_safely(output_fp)
                     
                     if df is not None:
+                        # แสดงคำเตือนถ้าอ่านไฟล์มีปัญหา (เช่น อ่านเป็น CSV แทน Excel)
                         if read_warning:
                             flash(read_warning, "warning")
                         
-                        # Add row numbers and format table
+                        # เพิ่มเลขลำดับให้แต่ละแถว (เริ่มจาก 1)
                         df.index = range(1, len(df) + 1)
+                        
+                        # สร้างตาราง HTML พร้อม CSS styling
                         table_html = df.to_html(
-                            classes="result-table table table-striped table-hover", 
-                            table_id="dataTable",
-                            index=True, 
-                            border=0,
-                            escape=False
+                            classes="result-table table table-striped table-hover",  # CSS classes สำหรับ Bootstrap
+                            table_id="dataTable",                                    # ID สำหรับ JavaScript
+                            index=True,                                             # แสดงเลขลำดับ
+                            border=0,                                               # ไม่ต้องมีขอบ
+                            escape=False                                            # อนุญาต HTML tags
                         )
                         
                         flash("ประมวลผลสำเร็จ", "success")
@@ -202,6 +206,7 @@ def index():
                                              total_records=len(df),
                                              func_name=func_name)
                     else:
+                        # ถ้าอ่านไฟล์ไม่ได้ แสดงข้อความแจ้งเตือน
                         flash(f"ไม่สามารถแสดงตารางได้: {read_warning}", "warning")
                         return render_template("result.html", 
                                              table_html=None, 
@@ -209,6 +214,7 @@ def index():
                                              func_name=func_name)
                         
                 except Exception as e:
+                    # จัดการข้อผิดพลาดในการแสดงตาราง
                     logger.error(f"Error displaying table: {e}")
                     flash(f"ไม่สามารถแสดงตารางได้: {str(e)}", "warning")
                     return render_template("result.html", 
@@ -216,6 +222,7 @@ def index():
                                          download_link=download_link,
                                          func_name=func_name)
             else:
+                # ถ้าไม่ต้องการแสดงตาราง แค่ให้ดาวน์โหลดไฟล์ได้
                 flash("ประมวลผลสำเร็จ สามารถดาวน์โหลดไฟล์ผลลัพธ์ได้", "success")
                 return render_template("result.html", 
                                      table_html=None, 
@@ -223,18 +230,24 @@ def index():
                                      func_name=func_name)
                 
         except Exception as e:
+            # จัดการข้อผิดพลาดทั่วไปของ route
             logger.error(f"Error in index route: {e}")
             flash(f"เกิดข้อผิดพลาด: {str(e)}", "error")
             return redirect(url_for("index"))
         finally:
+            # ลบไฟล์ชั่วคราวเสมอ ไม่ว่าจะสำเร็จหรือล้มเหลว
             if os.path.exists(temp_input):
                 shutil.rmtree(temp_input)
     
+    # ถ้าเป็น GET request ให้แสดงหน้าหลัก
     return render_template("index.html", functions=functions)
 
 @app.route("/result")
 def result():
-    """Redirect route for result page"""
+    """
+    หน้าผลลัพธ์ - ใช้เป็น fallback route 
+    ถ้ามีคนเข้า /result โดยตรง จะ redirect กลับหน้าหลัก
+    """
     flash("ไม่พบข้อมูลผลลัพธ์", "error")
     return redirect(url_for("index"))
 
@@ -383,12 +396,307 @@ def handle_exception(e):
     flash("เกิดข้อผิดพลาดที่ไม่คาดคิด กรุณาลองใหม่อีกครั้ง", "error")
     return redirect(url_for("index"))
 
+# ===== Service Classes สำหรับแยก Business Logic =====
+
+class FileProcessingService:
+    """
+    Service สำหรับจัดการไฟล์ทั้งหมด
+    - การตรวจสอบไฟล์
+    - การประมวลผลไฟล์
+    - การลบไฟล์ชั่วคราว
+    """
+    
+    @staticmethod
+    def process_files(files, func_name):
+        """
+        ประมวลผลไฟล์และรัน function ที่เลือก
+        Args:
+            files: ไฟล์ที่อัปโหลด
+            func_name: ชื่อ function ที่จะรัน
+        Returns:
+            tuple: (temp_input_dir, output_dir)
+        """
+        temp_input = tempfile.mkdtemp()  # สร้างโฟลเดอร์ชั่วคราว
+        output_dir = os.path.join(Config.BASE_DIR, f"output_{func_name}")
+        
+        try:
+            # สร้างโฟลเดอร์ output ถ้ายังไม่มี
+            os.makedirs(output_dir, exist_ok=True)
+            
+            # บันทึกไฟล์ที่อัปโหลดลงโฟลเดอร์ชั่วคราว
+            for f in files:
+                if f.filename:
+                    file_path = os.path.join(temp_input, f.filename)
+                    f.save(file_path)
+            
+            # โหลดและรัน function ที่เลือก
+            module = importlib.import_module(f"functions.{func_name}")
+            module.run(temp_input, output_dir)
+            
+            return temp_input, output_dir
+            
+        except Exception as e:
+            # ถ้าเกิดข้อผิดพลาด ลบไฟล์ชั่วคราวแล้ว raise error
+            if os.path.exists(temp_input):
+                shutil.rmtree(temp_input)
+            raise e
+    
+    @staticmethod
+    def validate_files(files):
+        """
+        ตรวจสอบความถูกต้องของไฟล์ที่อัปโหลด
+        Args:
+            files: รายการไฟล์ที่อัปโหลด
+        Returns:
+            tuple: (is_valid: bool, error_message: str)
+        """
+        # ตรวจสอบว่ามีไฟล์หรือไม่
+        if not files or files[0].filename == "":
+            return False, "กรุณาอัปโหลดไฟล์"
+        
+        # ตรวจสอบไฟล์แต่ละไฟล์
+        for file in files:
+            if file.filename:
+                is_valid, error_msg = FileUtils.validate_file(file)
+                if not is_valid:
+                    return False, error_msg
+        
+        return True, None
+    
+    @staticmethod
+    def get_output_files(output_dir):
+        """
+        หาไฟล์ผลลัพธ์ในโฟลเดอร์ output
+        Args:
+            output_dir: path ของโฟลเดอร์ output
+        Returns:
+            list: รายการชื่อไฟล์ (เรียงจากใหม่ไปเก่า)
+        """
+        if not os.path.exists(output_dir):
+            return []
+        
+        # หาไฟล์ที่เป็น Excel หรือ CSV
+        output_files = [f for f in os.listdir(output_dir) if f.endswith((".xlsx", ".csv"))]
+        
+        # เรียงจากไฟล์ใหม่ไปเก่า (ตาม modified time)
+        output_files.sort(key=lambda x: os.path.getmtime(os.path.join(output_dir, x)), reverse=True)
+        return output_files
+    
+    @staticmethod
+    def cleanup_temp_files(temp_dir):
+        """
+        ลบไฟล์ชั่วคราว
+        Args:
+            temp_dir: path ของโฟลเดอร์ชั่วคราว
+        """
+        if os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir)
+
+class TableRenderingService:
+    """
+    Service สำหรับสร้างและจัดการตาราง HTML
+    """
+    
+    @staticmethod
+    def generate_table_html(df, include_index=True):
+        """
+        สร้าง HTML table จาก DataFrame
+        Args:
+            df: pandas DataFrame
+            include_index: แสดงเลขลำดับหรือไม่
+        Returns:
+            str: HTML table string หรือ None ถ้า df ว่าง
+        """
+        if df is None or df.empty:
+            return None
+        
+        # เพิ่มเลขลำดับถ้าต้องการ
+        if include_index:
+            df.index = range(1, len(df) + 1)
+        
+        # สร้าง HTML table พร้อม Bootstrap CSS classes
+        table_html = df.to_html(
+            classes="result-table table table-striped table-hover",  # CSS classes
+            table_id="dataTable",                                    # ID สำหรับ JavaScript/CSS
+            index=include_index,                                     # แสดงเลขลำดับ
+            border=0,                                               # ไม่มีขอบ
+            escape=False                                            # อนุญาต HTML tags
+        )
+        
+        return table_html
+    
+    @staticmethod
+    def create_download_link(func_name, filename):
+        """
+        สร้าง link สำหรับดาวน์โหลดไฟล์
+        Args:
+            func_name: ชื่อ function
+            filename: ชื่อไฟล์
+        Returns:
+            str: URL สำหรับดาวน์โหลด
+        """
+        return url_for("download_file", func_name=func_name, filename=filename)
+    
+    @staticmethod
+    def render_result_page(table_html=None, download_link=None, total_records=0, func_name=""):
+        """
+        render หน้าผลลัพธ์พร้อมพารามิเตอร์ที่ครบถ้วน
+        Args:
+            table_html: HTML table string
+            download_link: link ดาวน์โหลด
+            total_records: จำนวนข้อมูลทั้งหมด
+            func_name: ชื่อ function
+        Returns:
+            flask Response object
+        """
+        return render_template("result.html", 
+                             table_html=table_html, 
+                             download_link=download_link,
+                             total_records=total_records,
+                             func_name=func_name)
+
+class LookupService:
+    """
+    Service สำหรับการค้นหา Last Type (BOM lookup)
+    """
+    
+    @staticmethod
+    def process_lookup(file_path):
+        """
+        ประมวลผลการค้นหา Last Type
+        Args:
+            file_path: path ของไฟล์ที่ต้องการค้นหา
+        Returns:
+            pandas DataFrame: ผลลัพธ์การค้นหา
+        """
+        # สร้างโฟลเดอร์ output สำหรับ PNP_CHANG_TYPE
+        output_dir = os.path.join(Config.BASE_DIR, "output_PNP_CHANG_TYPE")
+        os.makedirs(output_dir, exist_ok=True)
+        
+        logger.info("🔍 เริ่มค้นหาข้อมูล...")
+        # เรียกใช้ function lookup_last_type จาก PNP_CHANG_TYPE module
+        df_result = lookup_last_type(file_path, output_dir)
+        
+        return df_result
+    
+    @staticmethod
+    def validate_bom_columns(df):
+        """
+        ตรวจสอบว่า DataFrame มีคอลัมน์ BOM หรือไม่
+        Args:
+            df: pandas DataFrame
+        Returns:
+            tuple: (is_valid: bool, column_name_or_error: str)
+        """
+        has_bom, bom_col = FileUtils.check_bom_column(df)
+        if not has_bom:
+            available_cols = ", ".join(str(col) for col in df.columns)
+            return False, f"ไฟล์ไม่มีคอลัมน์ bom_no - คอลัมน์ที่มี: {available_cols}"
+        
+        return True, bom_col
+    
+    @staticmethod
+    def save_lookup_result(df_result, prefix="last_type_result"):
+        """
+        บันทึกผลลัพธ์การค้นหาลงไฟล์
+        Args:
+            df_result: pandas DataFrame ผลลัพธ์
+            prefix: prefix ของชื่อไฟล์
+        Returns:
+            tuple: (filename, file_path)
+        """
+        download_dir = os.path.join(Config.BASE_DIR, "output_lookup_last_type")
+        filename, result_path = FileUtils.save_result_file(df_result, download_dir, prefix)
+        return filename, result_path
+    
+    @staticmethod
+    def count_lookup_results(df_result):
+        """
+        นับจำนวนผลลัพธ์ที่พบและไม่พบ
+        Args:
+            df_result: pandas DataFrame ผลลัพธ์
+        Returns:
+            tuple: (found_count: int, not_found_count: int)
+        """
+        if df_result is None or df_result.empty:
+            return 0, 0
+        
+        total_records = len(df_result)
+        # นับจำนวนที่พบ Last_type (ไม่เป็น null)
+        found_count = df_result['Last_type'].notna().sum() if 'Last_type' in df_result.columns else 0
+        not_found_count = total_records - found_count
+        
+        return found_count, not_found_count
+
+# ===== Error Handler Class =====
+class ErrorHandler:
+    """
+    Class สำหรับจัดการ error แบบรวมศูนย์
+    """
+    
+    @staticmethod
+    def handle_lookup_error(error_msg):
+        """
+        จัดการ error สำหรับ lookup operations โดยแปลงเป็นข้อความที่ user เข้าใจง่าย
+        Args:
+            error_msg: ข้อความ error ดั้งเดิม
+        Returns:
+            str: ข้อความ error ที่เข้าใจง่าย
+        """
+        if "ไม่พบไฟล์ Last_Type.xlsx" in error_msg:
+            return "ไม่พบไฟล์ Last_Type.xlsx กรุณาวางไฟล์ในโฟลเดอร์ Upload หรือ output_PNP_CHANG_TYPE"
+        elif "ไม่มีคอลัมน์ bom_no" in error_msg:
+            return "ไฟล์ที่อัปโหลดไม่มีคอลัมน์ bom_no กรุณาตรวจสอบไฟล์"
+        elif "ไม่มีคอลัมน์: ['bom_no', 'Last_type']" in error_msg or "ไม่มีคอลัมน์: ['Last_type']" in error_msg:
+            return "ไฟล์ Last_Type.xlsx ไม่มีคอลัมน์ที่จำเป็น (bom_no, Last_type)"
+        else:
+            return f"เกิดข้อผิดพลาด: {error_msg}"
+    
+    @staticmethod
+    def log_and_flash_error(error, context="", flash_message=None):
+        """
+        บันทึก log และแสดงข้อความ error ให้ user
+        Args:
+            error: Exception หรือ error message
+            context: บริบทของ error (เช่น "File upload", "Function execution")
+            flash_message: ข้อความที่จะแสดงให้ user (ถ้าไม่ระบุ จะใช้ error message)
+        """
+        logger.error(f"{context}: {error}")
+        if flash_message:
+            flash(flash_message, "error")
+        else:
+            flash(f"เกิดข้อผิดพลาด: {str(error)}", "error")
+
+# ===== Constants Class =====
+class AppConstants:
+    """
+    รวม constants ทั้งหมดไว้ที่เดียว เพื่อง่ายต่อการแก้ไข
+    """
+    
+    # นามสกุลไฟล์ที่รองรับ
+    OUTPUT_FILE_EXTENSIONS = (".xlsx", ".csv")
+    
+    # CSS Classes สำหรับ HTML table
+    TABLE_CSS_CLASSES = "result-table table table-striped table-hover"
+    
+    # ประเภทของข้อความแจ้งเตือน
+    MSG_SUCCESS = "success"
+    MSG_ERROR = "error"
+    MSG_WARNING = "warning"
+    MSG_INFO = "info"
+    
+    # ชื่อโฟลเดอร์ output
+    OUTPUT_DIR_LOOKUP = "output_lookup_last_type"
+    OUTPUT_DIR_PNP = "output_PNP_CHANG_TYPE"
+
 if __name__ == "__main__":
-    # Ensure output directories exist
-    os.makedirs(os.path.join(Config.BASE_DIR, "output_lookup_last_type"), exist_ok=True)
+    # ===== การเตรียมโฟลเดอร์และเริ่มต้น Application =====
+    
+    # สร้างโฟลเดอร์ที่จำเป็น
+    os.makedirs(os.path.join(Config.BASE_DIR, AppConstants.OUTPUT_DIR_LOOKUP), exist_ok=True)
     os.makedirs(Config.FUNCTIONS_DIR, exist_ok=True)
     
-    # Get local IP
+    # หา IP address สำหรับแสดงใน log
     try:
         ip = socket.gethostbyname(socket.gethostname())
         logger.info("🚀 IE Function : Starting...")
@@ -400,7 +708,8 @@ if __name__ == "__main__":
         logger.error(f"Network detection failed: {e}")
         ip = "127.0.0.1"
     
-    # Use port 80 
+    # เริ่มต้น Flask application
     app.run(debug=Config.DEBUG, host=Config.HOST, port=Config.PORT, threaded=True)
 
-#version 2.1 Boss
+# ===== Version Information =====
+# version 2.3 Boss - Refactored with Service Classes and Better Comments
