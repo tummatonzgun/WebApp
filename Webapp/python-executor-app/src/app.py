@@ -1,4 +1,4 @@
-from flask import Flask, request, render_template, redirect, url_for, flash, session, send_file
+from flask import Flask, request, render_template, redirect, url_for, flash, session, send_file, jsonify
 import os
 import importlib
 import tempfile
@@ -366,6 +366,22 @@ def lookup_last_type_route():
                          download_link=download_link,
                          total_records=total_records)
 
+@app.route('/api/get_data_all_files')
+def get_data_all_files():
+    try:
+        data_all_path = os.path.join(Config.BASE_DIR, 'data_all')
+        
+        if not os.path.exists(data_all_path):
+            return jsonify({'files': [], 'error': 'ไม่พบโฟลเดอร์ data_all'})
+        
+        files = [f for f in os.listdir(data_all_path) 
+                if f.lower().endswith(('.txt', '.log'))]
+        files.sort()
+        
+        return jsonify({'files': files})
+    except Exception as e:
+        return jsonify({'files': [], 'error': str(e)})
+
 @app.errorhandler(404)
 def not_found_error(error):
     """Handle 404 errors"""
@@ -403,4 +419,4 @@ if __name__ == "__main__":
     # Use port 80 
     app.run(debug=Config.DEBUG, host=Config.HOST, port=Config.PORT, threaded=True)
 
-#version 2.0 
+#version 2.0

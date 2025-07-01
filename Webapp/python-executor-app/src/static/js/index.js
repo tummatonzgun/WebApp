@@ -363,57 +363,76 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // ข้อมูล operation-function mapping
+    const operationFunctions = {
+        "Singulation": ["LOGVIEW"],
+        "Pick & Place": ["PNP_CHANG_TYPE",],
+        "DA": ["data_analysis"],
+        "WB": ["wb_analysis"]
+    };
+
     // ข้อมูลคำแนะนำไฟล์สำหรับแต่ละฟังก์ชัน
     const fileGuidanceData = {
         "Singulation": {
             "LOGVIEW": {
-                acceptedFiles: ["TXT","txt"],
-                description: "ไฟล์ข้อมูล Singulatio ",
-                example: " MC 12 .txt"
-            },
-            "singulation_report": {
-                acceptedFiles: ["Excel (.xlsx, .xls)"],
-                description: "ไฟล์ข้อมูล Singulation เพื่อสร้างรายงาน",
-                example: "ตัวอย่าง: singulation_summary.xlsx"
-            }
-        },
-        "Pick & Place": {
-            "PNP_CHANG_TYPE": {
-                acceptedFiles: ["Excel (.xlsx, .xls)", "CSV (.csv)"],
-                description: "ไฟล์ข้อมูล Pick & Place ที่มีคอลั่ม assy_pack_type, bom_no ของแต่ละเดือน",
-                example: "ตัวอย่าง: WF size Apr1-Apr30'23 (UTL1), WF size Aug1-Aug31'23 (UTL1)"
-            },
-            "pnp_validation": {
-                acceptedFiles: ["Excel (.xlsx, .xls)"],
-                description: "ไฟล์เพื่อตรวจสอบความถูกต้องของ Pick & Place",
-                example: "ตัวอย่าง: pnp_validation.xlsx"
-            }
-        },
-        "DA": {
-            "data_analysis": {
-                acceptedFiles: ["Excel (.xlsx, .xls)", "CSV (.csv)"],
-                description: "ไฟล์ข้อมูลใดๆ ที่ต้องการวิเคราะห์ทางสtatistical",
-                example: "ตัวอย่าง: production_data.xlsx, quality_data.csv"
-            },
-            "trend_analysis": {
-                acceptedFiles: ["Excel (.xlsx, .xls)", "CSV (.csv)"],
-                description: "ไฟล์ข้อมูลที่มี timestamp หรือ sequence สำหรับวิเคราะห์แนวโน้ม",
-                example: "ตัวอย่าง: trend_data.xlsx"
-            }
-        },
-        "WB": {
-            "lookup_last_type": {
-                acceptedFiles: ["Excel (.xlsx, .xls)"],
-                description: "ไฟล์ BOM ที่มีคอลัมน์ Part Number และ Last Type",
-                example: "ตัวอย่าง: BOM_list.xlsx"
-            },
-            "validate_bom": {
-                acceptedFiles: ["Excel (.xlsx, .xls)"],
-                description: "ไฟล์ BOM เพื่อตรวจสอบความครบถ้วนและถูกต้อง",
-                example: "ตัวอย่าง: BOM_validation.xlsx"
+                acceptedFiles: ["Text Files (.txt)", "Log Files (.log)"],
+                description: "ไฟล์ Log จาก Singulation Machine ที่มีข้อมูล frame, speed, และ sec/strip",
+                example: "ตัวอย่าง: SG_log_20241201.txt, singulation_data.log"
             }
         }
+        // เพิ่ม operations อื่นๆ ตามต้องการ
     };
+
+    // จัดการการคลิกปุ่ม operation
+    document.querySelectorAll('.operation-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const operation = this.dataset.operation;
+            
+            // ลบ active class จากปุ่มอื่น
+            document.querySelectorAll('.operation-btn').forEach(b => b.classList.remove('active'));
+            
+            // เพิ่ม active class ให้ปุ่มที่เลือก
+            this.classList.add('active');
+            
+            // อัปเดต hidden input
+            document.getElementById('selectedOperation').value = operation;
+            
+            // อัปเดต function select
+            updateFunctionSelect(operation);
+        });
+    });
+
+    function updateFunctionSelect(selectedOperation) {
+        const funcSelect = document.getElementById('funcSelect');
+        const guidanceDiv = document.getElementById('fileGuidance');
+        const logviewOptions = document.getElementById('logviewOptions');
+        
+        // ซ่อนคำแนะนำและ LOGVIEW options เมื่อเปลี่ยน operation
+        guidanceDiv.style.display = 'none';
+        logviewOptions.style.display = 'none';
+        
+        // ล้างตัวเลือกฟังก์ชัน
+        funcSelect.innerHTML = '<option value="">-- กรุณาเลือกฟังก์ชัน --</option>';
+        
+        if (selectedOperation) {
+            // เปิดใช้งาน function select
+            funcSelect.disabled = false;
+            
+            // เพิ่มฟังก์ชันที่เกี่ยวข้องกับ operation ที่เลือก
+            if (operationFunctions[selectedOperation]) {
+                operationFunctions[selectedOperation].forEach(func => {
+                    const option = document.createElement('option');
+                    option.value = func;
+                    option.textContent = func;
+                    funcSelect.appendChild(option);
+                });
+            }
+        } else {
+            // ปิดใช้งาน function select
+            funcSelect.disabled = true;
+            funcSelect.innerHTML = '<option value="">-- กรุณาเลือก Operation ก่อน --</option>';
+        }
+    }
 
     // เพิ่มการจัดการเมื่อเลือกฟังก์ชัน
     document.getElementById('funcSelect').addEventListener('change', function() {
@@ -421,7 +440,20 @@ document.addEventListener('DOMContentLoaded', function() {
         const selectedOperation = document.getElementById('selectedOperation').value;
         const guidanceDiv = document.getElementById('fileGuidance');
         const guidanceContent = document.getElementById('guidanceContent');
+        const logviewOptions = document.getElementById('logviewOptions');
+        const regularFileUpload = document.getElementById('regularFileUpload');
         
+        // แสดง/ซ่อน LOGVIEW options
+        if (selectedFunction === 'LOGVIEW') {
+            logviewOptions.style.display = 'block';
+            loadDataAllFiles();
+            setupLogviewHandlers();
+        } else {
+            logviewOptions.style.display = 'none';
+            regularFileUpload.style.display = 'block';
+        }
+        
+        // แสดงคำแนะนำไฟล์
         if (selectedFunction && selectedOperation && fileGuidanceData[selectedOperation] && fileGuidanceData[selectedOperation][selectedFunction]) {
             const guidance = fileGuidanceData[selectedOperation][selectedFunction];
             
@@ -446,43 +478,95 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    function updateFunctionSelect(selectedOperation) {
-        const funcSelect = document.getElementById('funcSelect');
-        const guidanceDiv = document.getElementById('fileGuidance');
-        
-        // ซ่อนคำแนะนำเมื่อเปลี่ยน operation
-        guidanceDiv.style.display = 'none';
-        
-        // ล้างตัวเลือกฟังก์ชัน
-        funcSelect.innerHTML = '<option value="">-- กรุณาเลือกฟังก์ชัน --</option>';
-        
-        if (selectedOperation) {
-            // เปิดใช้งาน function select
-            funcSelect.disabled = false;
+    // ฟังก์ชันโหลดไฟล์จากโฟลเดอร์ data_all
+    async function loadDataAllFiles() {
+        try {
+            const response = await fetch('/api/get_data_all_files');
+            const data = await response.json();
             
-            // ข้อมูล operation-function mapping
-            const operationFunctions = {
-                "Singulation": ["LOGVIEW",],
-                "Pick & Place": ["PNP_CHANG_TYPE",],
-                "DA": [""],
-                "WB": [""]
-            };
+            const select = document.getElementById('dataAllFiles');
+            select.innerHTML = '';
             
-            // เพิ่มฟังก์ชันที่เกี่ยวข้องกับ operation ที่เลือก
-            if (operationFunctions[selectedOperation]) {
-                operationFunctions[selectedOperation].forEach(func => {
+            if (data.files && data.files.length > 0) {
+                data.files.forEach(file => {
                     const option = document.createElement('option');
-                    option.value = func;
-                    option.textContent = func;
-                    funcSelect.appendChild(option);
+                    option.value = file;
+                    option.textContent = file;
+                    select.appendChild(option);
                 });
+            } else {
+                const option = document.createElement('option');
+                option.textContent = 'ไม่พบไฟล์ในโฟลเดอร์ data_all';
+                option.disabled = true;
+                select.appendChild(option);
             }
-        } else {
-            // ปิดใช้งาน function select
-            funcSelect.disabled = true;
-            funcSelect.innerHTML = '<option value="">-- กรุณาเลือก Operation ก่อน --</option>';
+        } catch (error) {
+            console.error('Error loading data_all files:', error);
+            const select = document.getElementById('dataAllFiles');
+            select.innerHTML = '<option disabled>เกิดข้อผิดพลาดในการโหลดไฟล์</option>';
         }
     }
+
+    // ตั้งค่า event handlers สำหรับ LOGVIEW
+    function setupLogviewHandlers() {
+        const processingModeRadios = document.querySelectorAll('input[name="processing_mode"]');
+        const fileSelector = document.getElementById('fileSelector');
+        const regularFileUpload = document.getElementById('regularFileUpload');
+        
+        processingModeRadios.forEach(radio => {
+            radio.addEventListener('change', function() {
+                if (this.value === 'selected_files') {
+                    fileSelector.style.display = 'block';
+                    regularFileUpload.style.display = 'none';
+                } else {
+                    fileSelector.style.display = 'none';
+                    regularFileUpload.style.display = 'none';
+                }
+            });
+        });
+        
+        // ปุ่มเลือกทั้งหมด
+        document.getElementById('selectAllFiles').addEventListener('click', function() {
+            const select = document.getElementById('dataAllFiles');
+            for (let option of select.options) {
+                option.selected = true;
+            }
+        });
+        
+        // ปุ่มล้างทั้งหมด
+        document.getElementById('clearAllFiles').addEventListener('click', function() {
+            const select = document.getElementById('dataAllFiles');
+            for (let option of select.options) {
+                option.selected = false;
+            }
+        });
+        
+        // ปุ่มรีเฟรช
+        document.getElementById('refreshFiles').addEventListener('click', function() {
+            loadDataAllFiles();
+        });
+    }
+
+    // อัปเดต form submission
+    document.getElementById('mainForm').addEventListener('submit', function(e) {
+        const selectedFunction = document.getElementById('funcSelect').value;
+        
+        if (selectedFunction === 'LOGVIEW') {
+            const processingMode = document.querySelector('input[name="processing_mode"]:checked').value;
+            
+            if (processingMode === 'selected_files') {
+                const selectedFiles = Array.from(document.getElementById('dataAllFiles').selectedOptions);
+                if (selectedFiles.length === 0) {
+                    e.preventDefault();
+                    alert('กรุณาเลือกไฟล์อย่างน้อย 1 ไฟล์');
+                    return;
+                }
+            }
+        }
+        
+        // แสดง loading
+        document.getElementById('loading').style.display = 'flex';
+    });
 
     // Global functions for HTML onclick events
     window.removeFile = function(index) {
