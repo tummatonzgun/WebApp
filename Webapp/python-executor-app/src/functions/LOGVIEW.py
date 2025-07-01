@@ -414,51 +414,107 @@ def analyze_and_export_csv(summary_path, package_path, output_csv):
     print(f"✅ Exported summary CSV: {output_csv}")
 
 def analyze_and_export_csv_from_df(summary_df, package_path, output_csv):
+    # เพิ่มการตรวจสอบข้อมูล
+    print(f"📊 ตรวจสอบ summary_df shape: {summary_df.shape}")
+    print(f"📊 ตรวจสอบ summary_df columns: {summary_df.columns.tolist()}")
+    print(f"📊 ตรวจสอบ summary_df index: {summary_df.index.tolist()[:5]}")  # แสดง 5 แถวแรก
+    
+    if summary_df.empty:
+        print("❌ summary_df ว่างเปล่า!")
+        return
+    
     df = summary_df.reset_index()
+    
     # ตรวจสอบและเปลี่ยนชื่อคอลัมน์ index ให้เป็น 'FRAME_STOCK'
     if df.columns[0] != 'FRAME_STOCK':
         df = df.rename(columns={df.columns[0]: 'FRAME_STOCK'})
-    df2 = pd.read_excel(package_path)
+    
+    print(f"📊 ตรวจสอบ df หลัง reset_index: {df.shape}")
+    print(f"📊 ตรวจสอบ df columns: {df.columns.tolist()}")
+    
+    # ตรวจสอบไฟล์ package
+    if not os.path.exists(package_path):
+        print(f"❌ ไม่พบไฟล์ package: {package_path}")
+        return
+    
+    try:
+        df2 = pd.read_excel(package_path)
+        print(f"📊 ตรวจสอบ package file shape: {df2.shape}")
+        print(f"📊 ตรวจสอบ package file columns: {df2.columns.tolist()}")
+    except Exception as e:
+        print(f"❌ ไม่สามารถอ่านไฟล์ package: {e}")
+        return
+    
+    # ตรวจสอบว่ามีคอลัมน์ FRAME_STOCK ในทั้งสองไฟล์หรือไม่
+    if 'FRAME_STOCK' not in df.columns:
+        print("❌ ไม่พบคอลัมน์ FRAME_STOCK ใน summary data")
+        return
+    
+    if 'FRAME_STOCK' not in df2.columns:
+        print("❌ ไม่พบคอลัมน์ FRAME_STOCK ใน package file")
+        return
+    
     df['non_null_values'] = df.loc[:, df.columns != 'FRAME_STOCK'].apply(
         lambda row: row.dropna().tolist(), axis=1)
     df = df[['FRAME_STOCK', 'non_null_values']]
     df['TIME/STRIP'] = df['non_null_values'].apply(filtered_mean)
     df = df[['FRAME_STOCK', 'TIME/STRIP']]
+    
+    # ตรวจสอบข้อมูลหลังคำนวณ TIME/STRIP
+    print(f"📊 ข้อมูลหลังคำนวณ TIME/STRIP: {df[df['TIME/STRIP'].notna()].shape}")
+    
     df['SPEED (IPS)'] = df['FRAME_STOCK'].astype(str).str[-3:]
     df['X'] = df['FRAME_STOCK'].astype(str).str[0:6]
     df = df[['X', 'SPEED (IPS)', 'TIME/STRIP', 'FRAME_STOCK']]
     df = df.drop(columns='FRAME_STOCK')
     df['TIME/STRIP'] = df['TIME/STRIP'].round(2)
     df.rename(columns={'X': 'FRAME_STOCK'}, inplace=True)
+    
+    # ตรวจสอบคอลัมน์ที่ต้องการใน package file
+    required_cols = ['FRAME_STOCK', 'PACKAGE_CODE', 'Package size ', 'Package group', 'Lead frame type by frame stock ', 'Unit/strip']
+    available_cols = ['FRAME_STOCK'] + [col for col in required_cols[1:] if col in df2.columns]
+    
+    print(f"📊 คอลัมน์ที่มีใน package file: {available_cols}")
+    
     df_merged = pd.merge(
         df,
-        df2[['FRAME_STOCK', 'PACKAGE_CODE','Package size ','Package group','Lead frame','Unit/strip','Strip/lot']],
+        df2[available_cols],
         on='FRAME_STOCK',
         how='left'
     )
-    # แก้ไขการใช้ MAPPING
-    df_merged['Lead frame'] = df_merged.apply(
-        lambda row: MAPPING.get((str(row['Package group']), str(row['SPEED (IPS)'])), row['Lead frame']),
-        axis=1
-    )
+    
+    print(f"📊 ข้อมูลหลัง merge: {df_merged.shape}")
+    
+    # แก้ไขการใช้ MAPPING เฉพาะเมื่อมีคอลัมน์ที่จำเป็น
+    if 'Package group' in df_merged.columns and 'Lead frame type by frame stock ' in df_merged.columns:
+        df_merged['Lead frame'] = df_merged.apply(
+            lambda row: MAPPING.get((str(row['Package group']), str(row['SPEED (IPS)'])), 
+                                   row.get('Lead frame type by frame stock ', '')),
+            axis=1
+        )
     
     df_merged['Process'] = None
-    df_merged['Package group'] = df_merged['Package group'].astype(str).str.strip().str.upper()
-    # แปลง SPEED ให้เป็นตัวเลข
-    df_merged['SPEED (IPS)'] = pd.to_numeric(df_merged['SPEED (IPS)'], errors='coerce')
+    
+    if 'Package group' in df_merged.columns:
+        df_merged['Package group'] = df_merged['Package group'].astype(str).str.strip().str.upper()
+        
+        # แปลง SPEED ให้เป็นตัวเลข
+        df_merged['SPEED (IPS)'] = pd.to_numeric(df_merged['SPEED (IPS)'], errors='coerce')
 
-    # สร้างคอลัมน์ Process ด้วยเงื่อนไข
-    choices = [
-       (df_merged['SPEED (IPS)'] == 5) & (df_merged['Package group'] == 'SLP'),
-       (df_merged['SPEED (IPS)'] == 3) & (df_merged['Package group'] == 'SLP')
-    ]
+        # สร้างคอลัมน์ Process ด้วยเงื่อนไข
+        choices = [
+           (df_merged['SPEED (IPS)'] == 5) & (df_merged['Package group'] == 'SLP'),
+           (df_merged['SPEED (IPS)'] == 3) & (df_merged['Package group'] == 'SLP')
+        ]
 
-    answer = ['Full Cut', 'Step Cut']
+        answer = ['Full Cut', 'Step Cut']
+        df_merged['Process'] = np.select(choices, answer, default=None)
 
-    df_merged['Process'] = np.select(choices, answer, default=None)
-
-    df_merged.to_csv(output_csv, index=False)
-    print(f"✅ Exported summary CSV: {output_csv}")
+    try:
+        df_merged.to_csv(output_csv, index=False)
+        print(f"✅ Exported summary CSV: {output_csv}")
+    except Exception as e:
+        print(f"❌ ไม่สามารถบันทึกไฟล์ CSV: {e}")
 
 def run(input_path, output_dir):
     """
@@ -468,8 +524,14 @@ def run(input_path, output_dir):
     print(f"📁 Input: {input_path}")
     print(f"📁 Output: {output_dir}")
     
+    # ตรวจสอบว่า output_dir มีอยู่จริง
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+        print(f"📁 สร้าง output directory: {output_dir}")
+    
     # 1. ประมวลผลไฟล์ input และเก็บชื่อไฟล์ .xlsx ที่สร้างใหม่
     before_files = set(f for f in os.listdir(output_dir) if f.lower().endswith('.xlsx'))
+    print(f"📁 ไฟล์ .xlsx ก่อนประมวลผล: {len(before_files)} ไฟล์")
     
     process_multiple_files_complete(input_path, output_dir)
     
@@ -478,19 +540,30 @@ def run(input_path, output_dir):
     
     if not new_files:
         print("❌ ไม่พบไฟล์ .xlsx ใหม่")
+        print("💡 ตรวจสอบ:")
+        print("   - Input path ถูกต้องหรือไม่")
+        print("   - มีไฟล์ .txt ใน input path หรือไม่")
+        print("   - สิทธิ์ในการเขียนไฟล์ใน output directory")
         return
 
-    print(f"✅ สร้างไฟล์ใหม่ {len(new_files)} ไฟล์")
+    print(f"✅ สร้างไฟล์ใหม่ {len(new_files)} ไฟล์: {new_files}")
 
     # 2. ส่งเฉพาะไฟล์ใหม่ไปให้ summarize_sec_strip
     summary_df = summarize_sec_strip(output_dir, new_files)
     
+    if summary_df.empty:
+        print("❌ summary_df ว่างเปล่า - ไม่สามารถสร้าง Summary ได้")
+        return
+    
     # 3. ตรวจสอบไฟล์ package
-    package_path = os.path.join(BASE_DIR, "..", "Upload", "export package and frame stock Rev.02.xlsx")
+    package_path = os.path.join(BASE_DIR, "..", "Upload", "export package and frame stock Rev.03.xlsx")
     package_path = os.path.abspath(package_path)
     
+    print(f"📁 ตรวจสอบไฟล์ package: {package_path}")
+    
     if not os.path.exists(package_path):
-        print("❌ ไม่พบไฟล์ export package and frame stock Rev.02.xlsx ใน Upload")
+        print("❌ ไม่พบไฟล์ export package and frame stock Rev.03.xlsx ใน Upload")
+        print(f"💡 กรุณาตรวจสอบไฟล์ที่: {package_path}")
         return
     
     # 4. สร้างไฟล์ Summary.csv ด้วย timestamp
