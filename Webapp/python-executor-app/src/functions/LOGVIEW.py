@@ -502,5 +502,39 @@ def run(input_path, output_dir):
     print(f"🎉 ประมวลผลเสร็จสิ้น!")
     print(f"📊 ไฟล์ผลลัพธ์: {output_csv}")
 
+def group_and_average_across_frames_unique_frame(df):
+    grouping_cols = [
+        'Package size ',
+        'Package group',
+        'Lead frame',
+        'Unit/strip',
+        'SPEED (IPS)'
+    ]
+    
+    df_unique = df.drop_duplicates(subset=['FRAME_STOCK'])
+    group_avg_map = {}
+
+    for group_key, group_df in df_unique.groupby(grouping_cols):
+        values = group_df['TIME/STRIP'].dropna().tolist()
+        print(f"Group: {group_key}, Values Count: {len(values)}")  # debug
+        if len(values) < 2:
+            continue
+        q1 = np.percentile(values, 25)
+        q3 = np.percentile(values, 75)
+        iqr = q3 - q1
+        lower = q1 - 1.5 * iqr
+        upper = q3 + 1.5 * iqr
+        filtered = [v for v in values if lower <= v <= upper]
+        print(f"Filtered Values Count: {len(filtered)}")  # debug
+        if filtered:
+            avg_val = round(np.mean(filtered), 2)
+            group_avg_map[group_key] = avg_val
+
+    def assign_avg(row):
+        key = tuple(row[col] for col in grouping_cols)
+        return group_avg_map.get(key, row['TIME/STRIP'])
+
+    df['TIME/STRIP'] = df.apply(assign_avg, axis=1)
+    return df
 
 
