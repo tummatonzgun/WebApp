@@ -426,11 +426,11 @@ def analyze_and_export_csv_from_df(summary_df, package_path, output_csv):
     
     # โหลดข้อมูล package
     print(f"📁 โหลดข้อมูล package จาก: {package_path}")
-    df2 = pd.read_excel(package_path)
+    df2 = pd.read_excel(package_path, sheet_name="Export Worksheet")
     
     # ตรวจสอบคอลัมน์ที่มีอยู่ในไฟล์ package
     print("🔍 ตรวจสอบคอลัมน์ที่มีอยู่ในไฟล์ package...")
-    required_cols = ['FRAME_STOCK', 'PACKAGE_CODE', 'Package size ', 'Package group', 'Lead frame type by frame stock ', 'Unit/strip']
+    required_cols = ['FRAME_STOCK', 'PACKAGE_CODE', 'Package size ', 'Package group', 'Frame type ', 'Unit/strip']
     available_cols = ['FRAME_STOCK']  # FRAME_STOCK เป็นคอลัมน์หลักที่ต้องมี
     
     for col in required_cols[1:]:  # ข้าม FRAME_STOCK
@@ -507,133 +507,196 @@ def analyze_and_export_csv_from_df(summary_df, package_path, output_csv):
     return df_final
 
 def group_and_average_across_frames_unique_frame(df_merged):
-    """
-    จัดกลุ่มและคำนวณค่าเฉลี่ยข้าม Frame - ฟังก์ชันขั้นตอนสุดท้าย
-    """
     print("🔄 กำลังจัดกลุ่มและคำนวณค่าเฉลี่ย...")
     
-    # รายการคอลัมน์ที่ต้องการสำหรับจัดกลุ่ม (ตามลำดับความสำคัญ)
+    # รายการคอลัมน์ที่ต้องการสำหรับจัดกลุ่ม
     potential_grouping_cols = [
         'Package size ',
         'Package group',
-        'Lead frame type by frame stock ',
+        'Frame type ',
         'Unit/strip',
         'SPEED (IPS)'
     ]
     
-    # เลือกเฉพาะคอลัมน์ที่มีอยู่จริงในข้อมูล
     grouping_cols = [col for col in potential_grouping_cols if col in df_merged.columns]
     
-    # ต้องมี SPEED (IPS) อย่างน้อย เพื่อการจัดกลุ่ม
     if 'SPEED (IPS)' not in grouping_cols:
         print("❌ ไม่พบคอลัมน์ SPEED (IPS) ที่จำเป็นสำหรับการจัดกลุ่ม")
         return df_merged
     
-    print(f"📊 คอลัมน์ที่ใช้ในการจัดกลุ่ม: {grouping_cols}")
-    missing_cols = [col for col in potential_grouping_cols if col not in df_merged.columns]
-    if missing_cols:
-        print(f"⚠️  คอลัมน์ที่ไม่มีในข้อมูล: {missing_cols}")
-    
     print(f"📊 ข้อมูลเริ่มต้น: {df_merged.shape[0]} แถว")
     
-    # ลบข้อมูลที่ซ้ำกันตาม FRAME_STOCK
-    df_unique = df_merged.drop_duplicates(subset=['FRAME_STOCK'])
-    print(f"📊 ข้อมูลหลังลบ duplicate: {df_unique.shape[0]} แถว")
+    # ✅ วิธีที่ดีที่สุด: รวมข้อมูลแทนการลบ duplicate
+    print("🔄 รวมข้อมูล FRAME_STOCK ที่ซ้ำกัน...")
     
+    # ตรวจสอบ duplicate ก่อน
+    duplicated_frames = df_merged[df_merged.duplicated(subset=['FRAME_STOCK'], keep=False)]
+    if not duplicated_frames.empty:
+        print(f"⚠️  พบ FRAME_STOCK ที่ซ้ำกัน: {duplicated_frames['FRAME_STOCK'].nunique()} ตัว")
+        duplicate_analysis = {}
+        for frame in duplicated_frames['FRAME_STOCK'].unique():
+            frame_data = duplicated_frames[duplicated_frames['FRAME_STOCK'] == frame]
+            time_values = frame_data['TIME/STRIP'].dropna().tolist()
+            duplicate_analysis[frame] = {
+                'count': len(frame_data),
+                'time_values': time_values,
+                'non_null_count': len(time_values)
+            }
+            print(f"   - {frame}: {len(frame_data)} แถว → TIME/STRIP: {time_values}")
+    
+    # ✅ รวมข้อมูลโดยใช้กลยุทธ์ที่ดีที่สุด
+    def smart_aggregation(group):
+        # สำหรับ TIME/STRIP: ใช้ค่าเฉลี่ยของค่าที่ไม่เป็น NaN
+        time_values = group['TIME/STRIP'].dropna()
+        if len(time_values) > 0:
+            time_result = time_values.mean()
+        else:
+            time_result = np.nan
+        
+        # สำหรับคอลัมน์อื่นๆ: ใช้ค่าแรกที่ไม่เป็น NaN
+        result = {}
+        for col in df_merged.columns:
+            if col == 'TIME/STRIP':
+                result[col] = time_result
+            elif col == 'FRAME_STOCK':
+                result[col] = group[col].iloc[0]  # ใช้ค่าเดิม
+            else:
+                # ใช้ค่าแรกที่ไม่เป็น NaN
+                non_null_values = group[col].dropna()
+                if len(non_null_values) > 0:
+                    result[col] = non_null_values.iloc[0]
+                else:
+                    result[col] = group[col].iloc[0]
+        
+        return pd.Series(result)
+    
+    # รวมข้อมูลตาม FRAME_STOCK
+    df_unique = df_merged.groupby('FRAME_STOCK').apply(smart_aggregation).reset_index(drop=True)
+    
+    print(f"📊 ข้อมูลหลังรวม: {df_unique.shape[0]} แถว")
+    
+    # แสดงการเปลี่ยนแปลง TIME/STRIP
+    if not duplicated_frames.empty:
+        print("📊 การรวม TIME/STRIP สำหรับ FRAME_STOCK ที่ซ้ำ:")
+        for frame, info in duplicate_analysis.items():
+            if info['non_null_count'] > 1:
+                new_value = df_unique[df_unique['FRAME_STOCK'] == frame]['TIME/STRIP'].iloc[0]
+                if not pd.isna(new_value):
+                    print(f"   - {frame}: {info['time_values']} → {round(new_value, 2)} (เฉลี่ยจาก {info['non_null_count']} ค่า)")
+    
+    # ✅ ติดตาม FRAME_STOCK ที่ไม่มีข้อมูล TIME/STRIP
+    frames_without_time = df_unique[df_unique['TIME/STRIP'].isna()]['FRAME_STOCK'].tolist()
+    if frames_without_time:
+        print(f"⚠️  FRAME_STOCK ที่ไม่มีข้อมูล TIME/STRIP: {len(frames_without_time)} ตัว")
+        for frame in frames_without_time[:5]:  # แสดงแค่ 5 ตัวแรก
+            print(f"   - {frame}")
+        if len(frames_without_time) > 5:
+            print(f"   ... และอีก {len(frames_without_time) - 5} ตัว")
+    
+    # ประมวลผลต่อไป...
     group_avg_map = {}
-    # ✅ เพิ่ม dictionary สำหรับเก็บข้อมูลก่อนและหลังตัดแยกกัน
-    group_before_map = {}  # จำนวนก่อนตัด
-    group_after_map = {}   # จำนวนหลังตัด
+    group_before_map = {}
+    group_after_map = {}
     total_groups = 0
     processed_groups = 0
     total_outliers_removed = 0
-
+    excluded_frames = []
+    excluded_reasons = []
+    
     print("🔍 วิเคราะห์กลุ่มข้อมูล...")
     print("=" * 80)
     
     for group_key, group_df in df_unique.groupby(grouping_cols):
         total_groups += 1
+        group_name = " | ".join([f"{col}={val}" for col, val in zip(grouping_cols, group_key)])
+        total_frames_in_group = len(group_df)
+        
+        # นับเฉพาะข้อมูลที่มีค่า TIME/STRIP
         values = group_df['TIME/STRIP'].dropna().tolist()
-        
-        # ✅ สร้างชื่อกลุ่มแบบยืดหยุ่น (รองรับจำนวนคอลัมน์ที่เปลี่ยนแปลง)
-        if isinstance(group_key, tuple):
-            group_name_parts = []
-            for i, col in enumerate(grouping_cols):
-                if i < len(group_key):
-                    if col == 'SPEED (IPS)':
-                        group_name_parts.append(f"Speed:{group_key[i]}")
-                    elif col == 'Package size ':
-                        group_name_parts.append(f"Size:{group_key[i]}")
-                    elif col == 'Package group':
-                        group_name_parts.append(f"Group:{group_key[i]}")
-                    elif col == 'Unit/strip':
-                        group_name_parts.append(f"Unit:{group_key[i]}")
-                    elif col == 'Lead frame type by frame stock':
-                        group_name_parts.append(f"Lead:{group_key[i]}")
-                    else:
-                        group_name_parts.append(str(group_key[i]))
-            group_name = " | ".join(group_name_parts)
-        else:
-            # กรณีที่มีคอลัมน์เดียว
-            if grouping_cols[0] == 'SPEED (IPS)':
-                group_name = f"Speed:{group_key}"
-            else:
-                group_name = f"{grouping_cols[0]}:{group_key}"
-        
+        frames_with_data = group_df[group_df['TIME/STRIP'].notna()]['FRAME_STOCK'].tolist()
+        frames_without_data = group_df[group_df['TIME/STRIP'].isna()]['FRAME_STOCK'].tolist()
+
+        # ✅ แก้ไข: ใช้ len(values) แทน total_frames_in_group เพื่อนับเฉพาะที่มีข้อมูล
+        group_before_map[group_key] = len(values)  # ← เปลี่ยนตรงนี้
+    
+        # บันทึก FRAME_STOCK ที่ไม่มีข้อมูล TIME/STRIP
+        for frame in frames_without_data:
+            excluded_frames.append(frame)
+            excluded_reasons.append(f"กลุ่ม: {group_name} | เหตุผล: ไม่มีข้อมูล TIME/STRIP")
+
         if len(values) < 2:
             print(f"❌ กลุ่ม: {group_name}")
-            print(f"   📊 ข้อมูลไม่เพียงพอ: {len(values)} ค่า (ต้องการอย่างน้อย 2 ค่า)")
-            print(f"   📋 ค่าที่มี: {values}")
+            print(f"   📊 Frame Stock ทั้งหมด: {total_frames_in_group} ตัว")
+            print(f"   📊 มีข้อมูล TIME/STRIP: {len(values)} ค่า")
+            print(f"   📋 FRAME_STOCK ที่มีข้อมูล: {frames_with_data}")
+            if frames_without_data:
+                print(f"   ❌ FRAME_STOCK ที่ไม่มีข้อมูล: {frames_without_data}")
             
-            # ✅ เก็บข้อมูลจำนวนแม้ไม่ผ่าน
-            group_before_map[group_key] = len(values)
-            group_after_map[group_key] = 0
-            print()
-            continue
-            
-        # กรองข้อมูล outliers
-        q1 = np.percentile(values, 25)
-        q3 = np.percentile(values, 75)
-        iqr = q3 - q1
-        lower = q1 - 1.5 * iqr
-        upper = q3 + 1.5 * iqr
-        
-        # แยกข้อมูลที่ผ่านและไม่ผ่านการกรอง
-        filtered = [v for v in values if lower <= v <= upper]
-        outliers = [v for v in values if v < lower or v > upper]
-        
-        # ✅ เก็บจำนวนก่อนและหลังตัดแยกกัน
-        group_before_map[group_key] = len(values)
-        group_after_map[group_key] = len(filtered)
-        
-        if filtered:
-            avg_val = round(np.mean(filtered), 2)
-            group_avg_map[group_key] = avg_val
-            processed_groups += 1
-            total_outliers_removed += len(outliers)
-            
-            print(f"✅ กลุ่ม: {group_name}")
-            print(f"   📊 ข้อมูลทั้งหมด: {len(values)} ค่า")
-            print(f"   📈 ช่วงปกติ: {round(lower, 2)} - {round(upper, 2)}")
-            print(f"   ✅ ข้อมูลที่ใช้: {len(filtered)} ค่า → {filtered}")
-            
-            if outliers:
-                print(f"   ❌ Outliers ที่ตัดออก: {len(outliers)} ค่า → {outliers}")
-                print(f"   📊 เปอร์เซ็นต์ที่ตัด: {round(len(outliers)/len(values)*100, 1)}%")
+            # กำหนดค่าเฉลี่ยแม้มีข้อมูลน้อย
+            if len(values) == 1:
+                group_avg_map[group_key] = values[0]
+                group_after_map[group_key] = 1
+                print(f"   ✅ ใช้ค่าเดียว: {values[0]}")
+            elif len(values) == 0:
+                group_avg_map[group_key] = np.nan
+                group_after_map[group_key] = 0
+                print(f"   ⚠️  ไม่มีข้อมูล: ใช้ NaN")
             else:
-                print(f"   ✨ ไม่มี outliers (ข้อมูลทั้งหมดอยู่ในช่วงปกติ)")
-                
-            print(f"   🎯 ค่าเฉลี่ยสุดท้าย: {avg_val}")
-            print(f"   📊 จำนวน: {len(values)}/{len(filtered)} (ก่อนตัด/หลังตัด)")
+                group_avg_map[group_key] = np.mean(values)
+                group_after_map[group_key] = len(values)
+                print(f"   ✅ ใช้ค่าเฉลี่ยโดยไม่กรอง: {np.mean(values)}")
+            
+            print(f"   📊 จำนวน: {len(values)}/{group_after_map[group_key]} (มีข้อมูล/หลังตัด)")
             print()
+            
         else:
-            print(f"⚠️  กลุ่ม: {group_name}")
-            print(f"   📊 ข้อมูลทั้งหมด: {len(values)} ค่า → {values}")
-            print(f"   ❌ ไม่มีข้อมูลหลังกรองทั้งหมด (ทุกค่าเป็น outliers)")
-            print(f"   📈 ช่วงปกติ: {round(lower, 2)} - {round(upper, 2)}")
-            print(f"   📊 จำนวน: {len(values)}/0 (ก่อนตัด/หลังตัด)")
-            print()
+            # กรองข้อมูล outliers
+            q1 = np.percentile(values, 25)
+            q3 = np.percentile(values, 75)
+            iqr = q3 - q1
+            lower = q1 - 1.5 * iqr
+            upper = q3 + 1.5 * iqr
+            
+            filtered = [v for v in values if lower <= v <= upper]
+            outliers = [v for v in values if v < lower or v > upper]
+            
+            group_after_map[group_key] = len(filtered)
+            
+            if filtered:
+                avg_val = round(np.mean(filtered), 2)
+                group_avg_map[group_key] = avg_val
+                processed_groups += 1
+                total_outliers_removed += len(outliers)
+                
+                print(f"✅ กลุ่ม: {group_name}")
+                print(f"   📊 Frame Stock ทั้งหมด: {total_frames_in_group} ตัว")
+                print(f"   📊 มีข้อมูล TIME/STRIP: {len(values)} ค่า")
+                print(f"   📈 ช่วงปกติ: {round(lower, 2)} - {round(upper, 2)}")
+                print(f"   ✅ ข้อมูลที่ใช้: {len(filtered)} ค่า → {filtered}")
+                
+                if outliers:
+                    print(f"   ❌ Outliers ที่ตัดออก: {len(outliers)} ค่า → {outliers}")
+                    print(f"   📊 เปอร์เซ็นต์ที่ตัด: {round(len(outliers)/len(values)*100, 1)}%")
+                else:
+                    print(f"   ✨ ไม่มี outliers")
+                
+                print(f"   🎯 ค่าเฉลี่ยสุดท้าย: {avg_val}")
+                print(f"   📊 จำนวน: {len(values)}/{len(filtered)} (มีข้อมูล/หลังตัด)")
+                print()
+            else:
+                print(f"⚠️  กลุ่ม: {group_name}")
+                print(f"   📊 Frame Stock ทั้งหมด: {total_frames_in_group} ตัว")
+                print(f"   📊 ข้อมูลทั้งหมด: {len(values)} ค่า → {values}")
+                print(f"   ❌ ทุกค่าเป็น outliers")
+                print(f"   📈 ช่วงปกติ: {round(lower, 2)} - {round(upper, 2)}")
+                
+                group_avg_map[group_key] = round(np.mean(values), 2)
+                group_after_map[group_key] = 0
+                print(f"   ⚠️  ใช้ค่าเฉลี่ยดิบ: {round(np.mean(values), 2)}")
+                print(f"   📊 จำนวน: {len(values)}/0 (มีข้อมูล/หลังตัด)")
+                print()
 
+    # แสดงสรุป
     print("=" * 80)
     print(f"📈 สรุปการประมวลผล:")
     print(f"   🔢 กลุ่มทั้งหมด: {total_groups} กลุ่ม")
@@ -641,25 +704,31 @@ def group_and_average_across_frames_unique_frame(df_merged):
     print(f"   ❌ กลุ่มที่ข้ามไป: {total_groups - processed_groups} กลุ่ม")
     print(f"   🗑️  Outliers ที่ตัดออกทั้งหมด: {total_outliers_removed} ค่า")
     print(f"   📊 อัตราสำเร็จ: {round(processed_groups/total_groups*100, 1)}%")
-    print("=" * 80)
-
-    # ✅ ฟังก์ชันสำหรับกำหนดจำนวนก่อนตัด
+    
+    # แสดงรายงาน FRAME_STOCK ที่ไม่ถูกนำมาคิด
+    if excluded_frames:
+        print(f"\n❌ FRAME_STOCK ที่ไม่ถูกนำมาคิด: {len(excluded_frames)} ตัว")
+        print("=" * 80)
+        for i, (frame, reason) in enumerate(zip(excluded_frames, excluded_reasons), 1):
+            print(f"   {i:2d}. {frame} → {reason}")
+        print("=" * 80)
+    else:
+        print(f"\n✅ FRAME_STOCK ทุกตัวถูกนำมาคิดแล้ว")
+    
+    # ฟังก์ชันสำหรับ apply
     def assign_before_count(row):
         key = tuple(row[col] for col in grouping_cols)
         return group_before_map.get(key, 0)
 
-    # ✅ ฟังก์ชันสำหรับกำหนดจำนวนหลังตัด
     def assign_after_count(row):
         key = tuple(row[col] for col in grouping_cols)
         return group_after_map.get(key, 0)
 
-    # ✅ ฟังก์ชันสำหรับกำหนดค่าเฉลี่ย
     def assign_avg(row):
         key = tuple(row[col] for col in grouping_cols)
         original_value = row['TIME/STRIP']
         new_value = group_avg_map.get(key, original_value)
         
-        # แสดงการเปลี่ยนแปลงถ้ามี
         if pd.notna(original_value) and pd.notna(new_value) and abs(original_value - new_value) > 0.01:
             change_type = "📈" if new_value > original_value else "📉"
             diff = abs(new_value - original_value)
@@ -670,15 +739,14 @@ def group_and_average_across_frames_unique_frame(df_merged):
         return new_value
 
     print("🔄 กำลังอัปเดตค่า TIME/STRIP...")
-    df_merged['TIME/STRIP'] = df_merged.apply(assign_avg, axis=1)
-    
-    # ✅ เพิ่มคอลัมน์ใหม่: แยกกันเป็น 2 คอลัมน์
+    df_unique['TIME/STRIP'] = df_unique.apply(assign_avg, axis=1)
+
     print("📊 เพิ่มคอลัมน์จำนวนข้อมูลก่อนและหลังตัด...")
-    df_merged['Before_Outlier'] = df_merged.apply(assign_before_count, axis=1)
-    df_merged['After_Outlier'] = df_merged.apply(assign_after_count, axis=1)
-    
+    df_unique['Before_Outlier'] = df_unique.apply(assign_before_count, axis=1)
+    df_unique['After_Outlier'] = df_unique.apply(assign_after_count, axis=1)
+
     print("✅ เสร็จสิ้นการจัดกลุ่มและคำนวณค่าเฉลี่ย")
-    return df_merged
+    return df_unique
 
 def run(input_path, output_dir):
     """
@@ -698,36 +766,36 @@ def run(input_path, output_dir):
     new_files = list(after_files - before_files)
     
     if not new_files:
-        print("❌ ไม่พบไฟล์ .xlsx ใหม่")
+        print(" ไม่พบไฟล์ .xlsx ใหม่")
         return
 
-    print(f"✅ สร้างไฟล์ใหม่ {len(new_files)} ไฟล์")
+    print(f" สร้างไฟล์ใหม่ {len(new_files)} ไฟล์")
 
     # 2. สร้าง summary DataFrame
-    print("📊 ขั้นตอนที่ 2: สร้าง summary...")
+    print(" ขั้นตอนที่ 2: สร้าง summary...")
     summary_df = summarize_sec_strip(output_dir, new_files)
-    print(f"📊 ข้อมูล summary: {summary_df.shape}")
+    print(f" ข้อมูล summary: {summary_df.shape}")
     
     # 3. ตรวจสอบไฟล์ package
-    print("📊 ขั้นตอนที่ 3: ตรวจสอบไฟล์ package...")
-    package_path = os.path.join(BASE_DIR, "..", "Upload", "export package and frame stock Rev.03.xlsx")
+    print(" ขั้นตอนที่ 3: ตรวจสอบไฟล์ package...")
+    package_path = os.path.join(BASE_DIR, "..", "Upload", "export package and frame stock Rev.04.xlsx")
     package_path = os.path.abspath(package_path)
     
     if not os.path.exists(package_path):
-        print("❌ ไม่พบไฟล์ export package and frame stock Rev.03.xlsx ใน Upload")
+        print(" ไม่พบไฟล์ export package and frame stock Rev.04.xlsx ใน Upload")
         return
     
     # 4. สร้างไฟล์ Summary.csv ด้วย timestamp
-    print("📊 ขั้นตอนที่ 4: สร้างไฟล์ CSV สุดท้าย...")
+    print(" ขั้นตอนที่ 4: สร้างไฟล์ CSV สุดท้าย...")
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_csv = os.path.join(output_dir, f"Summary_{timestamp}.csv")
     
     # ✅ ฟังก์ชันนี้จะเรียกใช้ group_and_average_across_frames_unique_frame ในขั้นตอนสุดท้าย
     final_df = analyze_and_export_csv_from_df(summary_df, package_path, output_csv)
     
-    print(f"🎉 ประมวลผลเสร็จสิ้น!")
-    print(f"📊 ไฟล์ผลลัพธ์: {output_csv}")
-    print(f"📈 ข้อมูลสุดท้าย: {final_df.shape[0]} แถว")
+    print(f" ประมวลผลเสร็จสิ้น!")
+    print(f" ไฟล์ผลลัพธ์: {output_csv}")
+    print(f" ข้อมูลสุดท้าย: {final_df.shape[0]} แถว")
 
 
 
