@@ -54,32 +54,71 @@
 
                 <div class="form-group">
                     <label for="funcSelect">
-                        <i class="fas fa-function"></i>เลือกฟังก์ชัน:
+                        <i class="fas fa-cogs"></i> เลือกฟังก์ชัน:
                     </label>
-                    <select name="func_name" id="funcSelect" class="form-control" required disabled>
-                        <option value="">-- กรุณาเลือก Operation ก่อน --</option>
-                        {% for func in functions %}
-                        <option value="{{ func }}">{{ func }}</option>
-                        {% endfor %}
+                    <select name="func_name" id="funcSelect" class="form-control" required>
+                        <option value="">เลือกฟังก์ชัน</option>
                     </select>
-                    
-                    <!-- คำแนะนำไฟล์ -->
-                    <div id="fileGuidance" class="file-guidance" style="display:none;">
-                        <div class="guidance-header">
-                            <i class="fas fa-info-circle"></i>
-                            <span>คำแนะนำไฟล์สำหรับฟังก์ชันที่เลือก</span>
-                        </div>
-                        <div id="guidanceContent" class="guidance-content">
-                            <!-- เนื้อหาจะถูกเพิ่มด้วย JavaScript -->
-                        </div>
-                    </div>
                 </div>
 
                 <div class="form-group">
                     <label for="fileInput">
-                        <i class="fas fa-upload"></i>อัปโหลดไฟล์ (เลือกได้หลายไฟล์):
+                        <i class="fas fa-upload"></i>เลือกการจัดการ
                     </label>
-                    <input type="file" name="input_files" id="fileInput" class="form-control" multiple>
+                    
+                    <!-- File Input Method Selection -->
+                    <div class="input-method-selector">
+                        <div class="method-option">
+                            <input type="radio" id="uploadMethod" name="inputMethod" value="upload" checked>
+                            <label for="uploadMethod">
+                                <i class="fas fa-upload"></i> อัปโหลดไฟล์
+                            </label>
+                        </div>
+                        <div class="method-option">
+                            <input type="radio" id="folderMethod" name="inputMethod" value="folder">
+                            <label for="folderMethod">
+                                <i class="fas fa-folder"></i> เลือกจากโฟลเดอร์
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Upload File Section -->
+                    <div id="uploadSection" class="input-section">
+                        <input type="file" name="input_files" id="fileInput" class="form-control" multiple>
+                    </div>
+
+                    <!-- Folder File Selection Section -->
+                    <div id="folderSection" class="input-section" style="display: none;">
+                        <div class="folder-controls">
+                            <select id="folderSelect" class="form-control">
+                                <option value="">-- เลือกโฟลเดอร์ --</option>
+                            </select>
+                            <button type="button" id="refreshFolders" class="refresh-btn">
+                                <i class="fas fa-sync-alt"></i> รีเฟรช
+                            </button>
+                        </div>
+                        
+                        <div id="fileListContainer" class="file-list-container" style="display: none;">
+                            <div class="file-list-header">
+                                <h4>ไฟล์ในโฟลเดอร์:</h4>
+                                <div class="file-actions">
+                                    <button type="button" id="selectAllFiles" class="action-btn">
+                                        <i class="fas fa-check-square"></i> เลือกทั้งหมด
+                                    </button>
+                                    <button type="button" id="clearSelection" class="action-btn">
+                                        <i class="fas fa-times"></i> ยกเลิกการเลือก
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="fileList" class="file-list">
+                                <!-- Files will be populated here -->
+                            </div>
+                        </div>
+                        
+                        <!-- Hidden input for selected files -->
+                        <input type="hidden" name="selected_files" id="selectedFiles">
+                        <input type="hidden" name="selected_folder" id="selectedFolder">
+                    </div>
                 </div>
 
                 <div class="form-group">

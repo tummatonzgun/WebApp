@@ -6,28 +6,133 @@
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Index page loaded');
     
-    // Get DOM elements
+    // ลองหา elements หลายวิธี
     const elements = {
-        fileInput: document.getElementById('fileInput'),
-        funcSelect: document.getElementById('funcSelect'),
-        mainForm: document.getElementById('mainForm'),
+        fileInput: document.getElementById('fileInput') || document.querySelector('input[type="file"]'),
+        funcSelect: document.getElementById('funcSelect') || document.querySelector('select[name="func_name"]'),
+        mainForm: document.getElementById('mainForm') || document.querySelector('form'),
         lookupLastTypeLink: document.getElementById('lookupLastTypeLink'),
         loading: document.getElementById('loading'),
         showTableCheckbox: document.getElementById('showTable')
     };
 
-    // Check if required elements exist
-    if (!elements.fileInput || !elements.funcSelect || !elements.mainForm) {
-        console.error('Required DOM elements not found');
-        return;
-    }
+    // Additional elements for folder functionality
+    const folderElements = {
+        uploadMethodRadio: document.getElementById('uploadMethod'),
+        folderMethodRadio: document.getElementById('folderMethod'),
+        uploadSection: document.getElementById('uploadSection'),
+        folderSection: document.getElementById('folderSection'),
+        folderSelect: document.getElementById('folderSelect'),
+        refreshFoldersBtn: document.getElementById('refreshFolders'),
+        fileListContainer: document.getElementById('fileListContainer'),
+        fileList: document.getElementById('fileList'),
+        selectAllBtn: document.getElementById('selectAllFiles'),
+        clearSelectionBtn: document.getElementById('clearSelection'),
+        selectedFilesInput: document.getElementById('selectedFiles'),
+        selectedFolderInput: document.getElementById('selectedFolder')
+    };
+
+    // Global variables for folder functionality
+    let currentFolderFiles = [];
+    let selectedFiles = new Set();
+    let supportedExtensions = [];
+
+    console.log('=== Elements Found ===');
+    console.log('fileInput:', !!elements.fileInput, elements.fileInput);
+    console.log('funcSelect:', !!elements.funcSelect, elements.funcSelect);
+    console.log('mainForm:', !!elements.mainForm, elements.mainForm);
+    console.log('=== Folder Elements ===');
+    console.log('uploadMethodRadio:', !!folderElements.uploadMethodRadio);
+    console.log('folderMethodRadio:', !!folderElements.folderMethodRadio);
+    console.log('folderSelect:', !!folderElements.folderSelect);
 
     // Configuration
     const config = {
         functionsRequiringLookup: ['PNP_CHANG_TYPE'],
-        maxFileSize: 50 * 1024 * 1024, // 50MB
+        maxFileSize: 50 * 1024 * 1024,
         allowedFileTypes: ['.xlsx', '.xls', '.csv', '.txt']
     };
+
+    // ข้อมูลคำแนะนำไฟล์สำหรับแต่ละฟังก์ชัน
+    const fileGuidanceData = {
+        "Singulation": {
+            "LOGVIEW": {
+                acceptedFiles: ["TXT","txt"],
+                description: "ไฟล์ข้อมูล Singulation",
+                example: "MC 12.txt"
+            }
+        },
+        "Pick & Place": {
+            "PNP_CHANG_TYPE": {
+                acceptedFiles: ["Excel (.xlsx, .xls)", "CSV (.csv)"],
+                description: "ไฟล์ข้อมูล Pick & Place ที่มีคอลั่ม assy_pack_type, bom_no ของแต่ละเดือน",
+                example: "ตัวอย่าง: WF size Apr1-Apr30'23 (UTL1)"
+            }
+        },
+        "DA": {
+            "DIE_ATTACK_AUTO_UPH": {
+                acceptedFiles: ["Excel (.xlsx, .xls)", "CSV (.csv)"],
+                description: "ไฟล์ข้อมูล Die Attack Auto UPH",
+                example: "ตัวอย่าง: die_attack_data.xlsx"
+            }
+        },
+        "WB": {
+            "lookup_last_type": {
+                acceptedFiles: ["Excel (.xlsx, .xls)"],
+                description: "ไฟล์ BOM ที่มีคอลัมน์ Part Number และ Last Type",
+                example: "ตัวอย่าง: BOM_list.xlsx"
+            }
+        }
+    };
+
+    // ถ้าไม่เจอ funcSelect ให้สร้างขึ้นมาใหม่
+    if (!elements.funcSelect && elements.mainForm) {
+        console.log('Creating funcSelect element...');
+        createFuncSelectElement();
+    }
+
+    function createFuncSelectElement() {
+        // หา container ที่เหมาะสม
+        let container = document.querySelector('.form-group');
+        if (!container && elements.mainForm) {
+            container = elements.mainForm;
+        }
+
+        if (container) {
+            const selectHTML = `
+                <div class="form-group">
+                    <label for="funcSelect">
+                        <i class="fas fa-cogs"></i> เลือกฟังก์ชัน:
+                    </label>
+                    <select name="func_name" id="funcSelect" class="form-control" required>
+                        <option value="">เลือกฟังก์ชัน</option>
+                    </select>
+                </div>
+            `;
+            
+            container.insertAdjacentHTML('beforeend', selectHTML);
+            elements.funcSelect = document.getElementById('funcSelect');
+            console.log('✅ Created funcSelect element:', elements.funcSelect);
+        }
+    }
+
+    // Check if required elements exist
+    if (!elements.fileInput || !elements.funcSelect || !elements.mainForm) {
+        console.error('Required DOM elements not found');
+        console.log('fileInput:', !!elements.fileInput);
+        console.log('funcSelect:', !!elements.funcSelect);
+        console.log('mainForm:', !!elements.mainForm);
+        
+        // ลองอีกครั้งหลังจาก delay
+        setTimeout(() => {
+            elements.funcSelect = document.getElementById('funcSelect') || document.querySelector('select[name="func_name"]');
+            if (elements.funcSelect) {
+                console.log('✅ Found funcSelect after delay');
+                init();
+            }
+        }, 500);
+        return;
+    }
 
     // Initialize
     init();
@@ -35,31 +140,30 @@ document.addEventListener('DOMContentLoaded', function() {
     function init() {
         setupEventListeners();
         restoreFormState();
-        console.log('Index page initialized');
+        console.log('Index page initialized successfully');
     }
 
     function setupEventListeners() {
         // Form submission
-        elements.mainForm.addEventListener('submit', handleFormSubmit);
+        if (elements.mainForm) {
+            elements.mainForm.addEventListener('submit', handleFormSubmit);
+        }
 
         // Function selection
-        elements.funcSelect.addEventListener('change', handleFunctionChange);
+        if (elements.funcSelect) {
+            elements.funcSelect.addEventListener('change', handleFunctionChange);
+        }
 
         // File input changes
-        elements.fileInput.addEventListener('change', handleFileChange);
-
-        // Setup drag and drop
-        setupDragAndDrop();
-
-        // Form state changes
-        if (elements.showTableCheckbox) {
-            elements.showTableCheckbox.addEventListener('change', saveFormState);
+        if (elements.fileInput) {
+            elements.fileInput.addEventListener('change', handleFileChange);
         }
 
         // จัดการการคลิกปุ่ม operation
         document.querySelectorAll('.operation-btn').forEach(btn => {
             btn.addEventListener('click', function() {
                 const operation = this.dataset.operation;
+                console.log('Operation button clicked:', operation);
                 
                 // ลบ active class จากปุ่มอื่น
                 document.querySelectorAll('.operation-btn').forEach(b => b.classList.remove('active'));
@@ -68,54 +172,469 @@ document.addEventListener('DOMContentLoaded', function() {
                 this.classList.add('active');
                 
                 // อัปเดต hidden input
-                document.getElementById('selectedOperation').value = operation;
+                const selectedOperationInput = document.getElementById('selectedOperation');
+                if (selectedOperationInput) {
+                    selectedOperationInput.value = operation;
+                }
                 
                 // อัปเดต function select
                 updateFunctionSelect(operation);
             });
         });
+
+        // Input method selection - ตรวจสอบว่า element มีอยู่ก่อน
+        if (folderElements.uploadMethodRadio && folderElements.folderMethodRadio) {
+            folderElements.uploadMethodRadio.addEventListener('change', handleInputMethodChange);
+            folderElements.folderMethodRadio.addEventListener('change', handleInputMethodChange);
+        } else {
+            console.log('Upload/folder method radios not found');
+        }
+
+        // Folder operations - ตรวจสอบว่า element มีอยู่ก่อน
+        if (folderElements.refreshFoldersBtn) {
+            folderElements.refreshFoldersBtn.addEventListener('click', loadAvailableFolders);
+            // Load folders on page load
+            loadAvailableFolders();
+        }
+        
+        if (folderElements.folderSelect) {
+            folderElements.folderSelect.addEventListener('change', handleFolderSelection);
+        }
+        
+        if (folderElements.selectAllBtn) {
+            folderElements.selectAllBtn.addEventListener('click', selectAllSupportedFiles);
+        }
+        
+        if (folderElements.clearSelectionBtn) {
+            folderElements.clearSelectionBtn.addEventListener('click', clearFileSelection);
+        }
     }
 
-    function handleFormSubmit(e) {
-        console.log('Form submitted');
+    // ===== EVENT HANDLERS =====
+
+    function handleInputMethodChange() {
+        console.log('Input method changed');
         
-        // Basic validation
-        if (!elements.funcSelect.value) {
-            e.preventDefault();
-            showMessage('กรุณาเลือกฟังก์ชันก่อน', 'error');
+        if (!folderElements.uploadMethodRadio || !folderElements.folderMethodRadio || 
+            !folderElements.uploadSection || !folderElements.folderSection) {
+            console.log('Some input method elements missing');
             return;
         }
-
-        if (!elements.fileInput.files.length) {
-            e.preventDefault();
-            showMessage('กรุณาเลือกไฟล์ก่อน', 'error');
-            return;
+        
+        if (folderElements.uploadMethodRadio.checked) {
+            folderElements.uploadSection.style.display = 'block';
+            folderElements.folderSection.style.display = 'none';
+            clearFileSelection();
+        } else {
+            folderElements.uploadSection.style.display = 'none';
+            folderElements.folderSection.style.display = 'block';
+            if (elements.fileInput) {
+                elements.fileInput.value = '';
+            }
         }
-
-        // Validate files
-        const validation = validateFiles(elements.fileInput.files);
-        if (!validation.isValid) {
-            e.preventDefault();
-            showMessage(validation.message, 'error');
-            return;
-        }
-
-        // Show loading
-        showLoading();
         saveFormState();
+    }
+
+    function updateFunctionSelect(operation) {
+        console.log('=== updateFunctionSelect ===');
+        console.log('Operation:', operation);
+        console.log('funcSelect element:', elements.funcSelect);
+        
+        if (!elements.funcSelect) {
+            console.error('❌ funcSelect element not found!');
+            // ลองหาใหม่
+            elements.funcSelect = document.getElementById('funcSelect') || document.querySelector('select[name="func_name"]');
+            if (!elements.funcSelect) {
+                console.error('❌ Still cannot find funcSelect element');
+                return;
+            }
+        }
+        
+        // Clear current options
+        elements.funcSelect.innerHTML = '<option value="">เลือกฟังก์ชัน</option>';
+        
+        // Get functions for selected operation
+        if (fileGuidanceData[operation]) {
+            console.log('✅ Found functions for operation:', Object.keys(fileGuidanceData[operation]));
+            Object.keys(fileGuidanceData[operation]).forEach(funcName => {
+                const option = document.createElement('option');
+                option.value = funcName;
+                option.textContent = funcName;
+                elements.funcSelect.appendChild(option);
+                console.log('Added function option:', funcName);
+            });
+            console.log(`✅ Added ${Object.keys(fileGuidanceData[operation]).length} functions`);
+        } else {
+            console.log('❌ No functions found for operation:', operation);
+            console.log('Available operations:', Object.keys(fileGuidanceData));
+        }
+        
+        // Update supported extensions for folder method
+        updateSupportedExtensions();
+        
+        saveFormState();
+    }
+
+    function updateSupportedExtensions() {
+        const selectedOperation = document.getElementById('selectedOperation') ? document.getElementById('selectedOperation').value : '';
+        const selectedFunction = elements.funcSelect ? elements.funcSelect.value : '';
+        
+        supportedExtensions = [];
+        
+        if (selectedOperation && selectedFunction && fileGuidanceData[selectedOperation] && fileGuidanceData[selectedOperation][selectedFunction]) {
+            const guidance = fileGuidanceData[selectedOperation][selectedFunction];
+            
+            // Extract file extensions from acceptedFiles
+            guidance.acceptedFiles.forEach(fileType => {
+                if (fileType.includes('TXT') || fileType.includes('txt')) {
+                    supportedExtensions.push('.txt');
+                }
+                if (fileType.includes('.xlsx')) {
+                    supportedExtensions.push('.xlsx');
+                }
+                if (fileType.includes('.xls')) {
+                    supportedExtensions.push('.xls');
+                }
+                if (fileType.includes('.csv')) {
+                    supportedExtensions.push('.csv');
+                }
+            });
+        }
+        
+        console.log('Supported extensions:', supportedExtensions);
+        
+        // Refresh file list if folder is selected
+        if (folderElements.folderMethodRadio && folderElements.folderMethodRadio.checked && 
+            folderElements.folderSelect && folderElements.folderSelect.value) {
+            loadFolderFiles(folderElements.folderSelect.value);
+        }
     }
 
     function handleFunctionChange() {
         const selectedFunction = elements.funcSelect.value;
         console.log('Function selected:', selectedFunction);
 
-        // Toggle lookup link visibility
         toggleLookupLink(selectedFunction);
+        updateSupportedExtensions();
         saveFormState();
+    }
 
-        if (selectedFunction) {
-            showMessage(`เลือกฟังก์ชัน: ${selectedFunction}`, 'info');
+    function handleFormSubmit(e) {
+        console.log('Form submitted');
+        
+        // Check if using folder method
+        if (folderElements.folderMethodRadio && folderElements.folderMethodRadio.checked) {
+            // Validate folder selection
+            if (!folderElements.folderSelect || !folderElements.folderSelect.value) {
+                e.preventDefault();
+                alert('กรุณาเลือกโฟลเดอร์ก่อน');
+                return;
+            }
+
+            if (selectedFiles.size === 0) {
+                e.preventDefault();
+                alert('กรุณาเลือกไฟล์อย่างน้อย 1 ไฟล์');
+                return;
+            }
+
+            // Show loading and continue
+            if (elements.loading) {
+                elements.loading.style.display = 'block';
+            }
+            saveFormState();
+            return;
         }
+        
+        // Original validation for upload method
+        if (!elements.funcSelect.value) {
+            e.preventDefault();
+            alert('กรุณาเลือกฟังก์ชันก่อน');
+            return;
+        }
+
+        if (!elements.fileInput.files.length) {
+            e.preventDefault();
+            alert('กรุณาเลือกไฟล์ก่อน');
+            return;
+        }
+
+        if (elements.loading) {
+            elements.loading.style.display = 'block';
+        }
+        
+        saveFormState();
+    }
+
+    // ===== FOLDER FUNCTIONS =====
+
+    async function loadAvailableFolders() {
+        console.log('🔄 Loading available folders...');
+        
+        if (!folderElements.refreshFoldersBtn || !folderElements.folderSelect) {
+            console.log('❌ Required folder elements not found');
+            return;
+        }
+
+        try {
+            folderElements.refreshFoldersBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> กำลังโหลด...';
+            folderElements.refreshFoldersBtn.disabled = true;
+
+            const response = await fetch('/api/folders');
+            const data = await response.json();
+
+            console.log('📊 Folders response:', data);
+
+            folderElements.folderSelect.innerHTML = '<option value="">-- เลือกโฟลเดอร์ --</option>';
+            
+            if (data.success && data.folders) {
+                data.folders.forEach(folder => {
+                    const option = document.createElement('option');
+                    option.value = folder.path;
+                    option.textContent = folder.name;
+                    folderElements.folderSelect.appendChild(option);
+                });
+                console.log(`✅ Loaded ${data.folders.length} folders`);
+            } else {
+                console.error('❌ Failed to load folders:', data.message);
+            }
+
+        } catch (error) {
+            console.error('❌ Error loading folders:', error);
+        } finally {
+            folderElements.refreshFoldersBtn.innerHTML = '<i class="fas fa-sync-alt"></i> รีเฟรช';
+            folderElements.refreshFoldersBtn.disabled = false;
+        }
+    }
+
+    async function handleFolderSelection() {
+        const selectedFolder = folderElements.folderSelect ? folderElements.folderSelect.value : '';
+        console.log('📂 Folder selected:', selectedFolder);
+        
+        if (selectedFolder) {
+            await loadFolderFiles(selectedFolder);
+            if (folderElements.fileListContainer) {
+                folderElements.fileListContainer.style.display = 'block';
+            }
+            if (folderElements.selectedFolderInput) {
+                folderElements.selectedFolderInput.value = selectedFolder;
+            }
+        } else {
+            if (folderElements.fileListContainer) {
+                folderElements.fileListContainer.style.display = 'none';
+            }
+            clearFileSelection();
+        }
+    }
+
+    async function loadFolderFiles(folderPath) {
+        console.log('📁 Loading files from folder:', folderPath);
+        
+        if (!folderElements.fileList) {
+            console.error('❌ File list element not found');
+            return;
+        }
+
+        try {
+            folderElements.fileList.innerHTML = `
+                <div class="loading-files">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <p>กำลังโหลดไฟล์...</p>
+                </div>
+            `;
+
+            const response = await fetch(`/api/folder-files?path=${encodeURIComponent(folderPath)}`);
+            const data = await response.json();
+
+            if (data.success && data.files) {
+                currentFolderFiles = data.files;
+                console.log(`✅ Found ${currentFolderFiles.length} files`);
+                renderFileList();
+            } else {
+                console.error('❌ Failed to load files:', data.message);
+                folderElements.fileList.innerHTML = `
+                    <div class="error-message">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <p>${data.message || 'ไม่สามารถโหลดไฟล์ในโฟลเดอร์ได้'}</p>
+                    </div>
+                `;
+            }
+
+        } catch (error) {
+            console.error('❌ Error loading folder files:', error);
+            folderElements.fileList.innerHTML = `
+                <div class="error-message">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p>เกิดข้อผิดพลาดในการโหลดไฟล์</p>
+                </div>
+            `;
+        }
+    }
+
+    function renderFileList() {
+        if (!folderElements.fileList) return;
+
+        if (currentFolderFiles.length === 0) {
+            folderElements.fileList.innerHTML = `
+                <div class="empty-folder">
+                    <i class="fas fa-folder-open"></i>
+                    <p>ไม่พบไฟล์ในโฟลเดอร์นี้</p>
+                </div>
+            `;
+            return;
+        }
+
+        folderElements.fileList.innerHTML = '';
+        
+        currentFolderFiles.forEach(file => {
+            const isSupported = isFileSupported(file.name);
+            const fileItem = createFileItem(file, isSupported);
+            folderElements.fileList.appendChild(fileItem);
+        });
+
+        updateSelectionSummary();
+    }
+
+    function createFileItem(file, isSupported) {
+        const fileItem = document.createElement('div');
+        fileItem.className = `file-item ${isSupported ? '' : 'disabled'}`;
+        
+        const fileExtension = file.name.split('.').pop().toLowerCase();
+        const fileIcon = getFileIconClass(fileExtension);
+        
+        fileItem.innerHTML = `
+            <input type="checkbox" class="file-checkbox" 
+                   ${isSupported ? '' : 'disabled'} 
+                   data-file="${file.name}"
+                   ${selectedFiles.has(file.name) ? 'checked' : ''}>
+            <div class="file-info">
+                <div class="file-icon ${fileExtension}">
+                    <i class="${fileIcon}"></i>
+                </div>
+                <div class="file-details">
+                    <div class="file-name">${file.name}</div>
+                    <div class="file-size">${formatFileSize(file.size)}</div>
+                </div>
+                <div class="file-status ${isSupported ? 'supported' : 'unsupported'}">
+                    ${isSupported ? 'รองรับ' : 'ไม่รองรับ'}
+                </div>
+            </div>
+        `;
+
+        if (isSupported) {
+            const checkbox = fileItem.querySelector('.file-checkbox');
+            checkbox.addEventListener('change', handleFileSelection);
+            fileItem.addEventListener('click', (e) => {
+                if (e.target.type !== 'checkbox') {
+                    checkbox.checked = !checkbox.checked;
+                    handleFileSelection({ target: checkbox });
+                }
+            });
+        }
+
+        return fileItem;
+    }
+
+    function getFileIconClass(extension) {
+        const iconMap = {
+            'txt': 'fas fa-file-alt',
+            'xlsx': 'fas fa-file-excel',
+            'xls': 'fas fa-file-excel',
+            'csv': 'fas fa-file-csv'
+        };
+        return iconMap[extension] || 'fas fa-file';
+    }
+
+    function isFileSupported(filename) {
+        if (supportedExtensions.length === 0) return true;
+        
+        const fileExtension = '.' + filename.split('.').pop().toLowerCase();
+        return supportedExtensions.includes(fileExtension);
+    }
+
+    function handleFileSelection(event) {
+        const filename = event.target.dataset.file;
+        const isChecked = event.target.checked;
+
+        if (isChecked) {
+            selectedFiles.add(filename);
+        } else {
+            selectedFiles.delete(filename);
+        }
+
+        const fileItem = event.target.closest('.file-item');
+        if (isChecked) {
+            fileItem.classList.add('selected');
+        } else {
+            fileItem.classList.remove('selected');
+        }
+
+        updateSelectedFilesInput();
+        updateSelectionSummary();
+    }
+
+    function selectAllSupportedFiles() {
+        currentFolderFiles.forEach(file => {
+            if (isFileSupported(file.name)) {
+                selectedFiles.add(file.name);
+            }
+        });
+        
+        document.querySelectorAll('.file-checkbox:not([disabled])').forEach(checkbox => {
+            checkbox.checked = true;
+            checkbox.closest('.file-item').classList.add('selected');
+        });
+
+        updateSelectedFilesInput();
+        updateSelectionSummary();
+    }
+
+    function clearFileSelection() {
+        selectedFiles.clear();
+        
+        document.querySelectorAll('.file-checkbox').forEach(checkbox => {
+            checkbox.checked = false;
+            checkbox.closest('.file-item').classList.remove('selected');
+        });
+
+        updateSelectedFilesInput();
+        updateSelectionSummary();
+    }
+
+    function updateSelectedFilesInput() {
+        if (folderElements.selectedFilesInput) {
+            folderElements.selectedFilesInput.value = Array.from(selectedFiles).join(',');
+        }
+    }
+
+    function updateSelectionSummary() {
+        if (!folderElements.fileListContainer) return;
+
+        const existingSummary = document.querySelector('.selection-summary');
+        if (existingSummary) {
+            existingSummary.remove();
+        }
+
+        if (selectedFiles.size > 0) {
+            const summary = document.createElement('div');
+            summary.className = 'selection-summary';
+            summary.innerHTML = `
+                <div class="selection-count">
+                    <i class="fas fa-check-circle"></i>
+                    เลือกแล้ว: ${selectedFiles.size} ไฟล์
+                </div>
+            `;
+            folderElements.fileListContainer.appendChild(summary);
+        }
+    }
+
+    // ===== UTILITY FUNCTIONS =====
+
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
 
     function toggleLookupLink(functionName) {
@@ -133,378 +652,48 @@ document.addEventListener('DOMContentLoaded', function() {
     function handleFileChange() {
         const files = Array.from(elements.fileInput.files);
         console.log('Files selected:', files.length);
-
-        if (files.length > 0) {
-            // Basic validation
-            const validation = validateFiles(files);
-            
-            if (validation.isValid) {
-                updateFileDisplay(files);
-                showMessage(`เลือกไฟล์สำเร็จ: ${files.length} ไฟล์`, 'success');
-                
-                // Visual feedback
-                elements.fileInput.style.borderColor = '#28a745';
-                elements.fileInput.style.background = '#f8fff8';
-            } else {
-                showMessage(validation.message, 'error');
-                elements.fileInput.style.borderColor = '#dc3545';
-            }
-        } else {
-            clearFileDisplay();
-            elements.fileInput.style.borderColor = '';
-            elements.fileInput.style.background = '';
-        }
-
         saveFormState();
     }
 
-    function validateFiles(files) {
-        const { maxFileSize, allowedFileTypes } = config;
-
-        for (let file of files) {
-            // Check file size
-            if (file.size > maxFileSize) {
-                return {
-                    isValid: false,
-                    message: `ไฟล์ "${file.name}" มีขนาดใหญ่เกินไป (สูงสุด ${formatFileSize(maxFileSize)})`
-                };
-            }
-
-            // Check file type
-            const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
-            if (!allowedFileTypes.includes(fileExtension)) {
-                return {
-                    isValid: false,
-                    message: `ไฟล์ "${file.name}" ไม่ใช่ประเภทที่รองรับ (${allowedFileTypes.join(', ')})`
-                };
-            }
-
-            // Check for empty files
-            if (file.size === 0) {
-                return {
-                    isValid: false,
-                    message: `ไฟล์ "${file.name}" เป็นไฟล์ว่าง`
-                };
-            }
-        }
-
-        return { isValid: true };
-    }
-
-    function updateFileDisplay(files) {
-        let fileDisplayArea = document.getElementById('fileDisplayArea');
-        
-        // Create display area if it doesn't exist
-        if (!fileDisplayArea) {
-            fileDisplayArea = createFileDisplayArea();
-        }
-
-        if (files.length > 0) {
-            fileDisplayArea.innerHTML = generateFileListHTML(files);
-            fileDisplayArea.style.display = 'block';
-        } else {
-            fileDisplayArea.style.display = 'none';
-        }
-    }
-
-    function createFileDisplayArea() {
-        const fileDisplayArea = document.createElement('div');
-        fileDisplayArea.id = 'fileDisplayArea';
-        fileDisplayArea.className = 'file-display-area';
-        fileDisplayArea.style.cssText = `
-            margin-top: 15px;
-            padding: 15px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            border: 1px solid #e9ecef;
-        `;
-        elements.fileInput.parentNode.appendChild(fileDisplayArea);
-        return fileDisplayArea;
-    }
-
-    function generateFileListHTML(files) {
-        let html = '<div style="font-weight: 600; margin-bottom: 10px; color: #495057;"><i class="fas fa-file-check"></i> ไฟล์ที่เลือก:</div>';
-        
-        files.forEach((file, index) => {
-            const fileSize = formatFileSize(file.size);
-            const fileIcon = getFileIcon(file.name);
-            
-            html += `
-                <div style="display: flex; align-items: center; padding: 8px 0; border-bottom: 1px solid #dee2e6;">
-                    <i class="${fileIcon}" style="margin-right: 10px; color: #28a745;"></i>
-                    <div style="flex: 1;">
-                        <div style="font-weight: 500;">${file.name}</div>
-                        <div style="font-size: 0.9em; color: #6c757d;">${fileSize}</div>
-                    </div>
-                    <button type="button" onclick="removeFile(${index})" style="
-                        background: #dc3545; 
-                        color: white; 
-                        border: none; 
-                        border-radius: 50%; 
-                        width: 24px; 
-                        height: 24px; 
-                        cursor: pointer;
-                        font-size: 12px;
-                    ">×</button>
-                </div>
-            `;
-        });
-        
-        return html;
-    }
-
-    function clearFileDisplay() {
-        const fileDisplayArea = document.getElementById('fileDisplayArea');
-        if (fileDisplayArea) {
-            fileDisplayArea.style.display = 'none';
-        }
-    }
-
-    function setupDragAndDrop() {
-        const { fileInput } = elements;
-        
-        // Prevent default drag behaviors
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            fileInput.addEventListener(eventName, preventDefaults, false);
-        });
-
-        // Highlight drop area
-        ['dragenter', 'dragover'].forEach(eventName => {
-            fileInput.addEventListener(eventName, highlight, false);
-        });
-
-        ['dragleave', 'drop'].forEach(eventName => {
-            fileInput.addEventListener(eventName, unhighlight, false);
-        });
-
-        // Handle file drop
-        fileInput.addEventListener('drop', handleDrop, false);
-
-        function preventDefaults(e) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-
-        function highlight(e) {
-            fileInput.style.borderColor = '#667eea';
-            fileInput.style.background = '#f0f4ff';
-        }
-
-        function unhighlight(e) {
-            fileInput.style.borderColor = '';
-            fileInput.style.background = '';
-        }
-
-        function handleDrop(e) {
-            const dt = e.dataTransfer;
-            const files = dt.files;
-            
-            if (files.length > 0) {
-                fileInput.files = files;
-                handleFileChange();
-            }
-        }
-    }
-
-    function showLoading() {
-        if (elements.loading) {
-            elements.loading.style.display = 'block';
-        }
-        
-        // Disable form
-        const formContainer = document.querySelector('.form-container');
-        if (formContainer) {
-            formContainer.style.opacity = '0.5';
-            formContainer.style.pointerEvents = 'none';
-        }
-    }
-
     function saveFormState() {
-        const state = {
-            selectedFunction: elements.funcSelect.value,
-            showTable: elements.showTableCheckbox?.checked,
-            timestamp: Date.now()
-        };
-        
         try {
-            localStorage.setItem('indexFormState', JSON.stringify(state));
-        } catch (error) {
-            console.warn('Failed to save form state:', error);
+            const state = {
+                selectedFunction: elements.funcSelect ? elements.funcSelect.value : '',
+                selectedOperation: document.getElementById('selectedOperation') ? document.getElementById('selectedOperation').value : '',
+                inputMethod: folderElements.uploadMethodRadio ? (folderElements.uploadMethodRadio.checked ? 'upload' : 'folder') : 'upload'
+            };
+            localStorage.setItem('formState', JSON.stringify(state));
+        } catch (e) {
+            console.log('Could not save form state:', e);
         }
     }
 
     function restoreFormState() {
         try {
-            const savedState = localStorage.getItem('indexFormState');
-            if (!savedState) return;
-
-            const state = JSON.parse(savedState);
+            const state = JSON.parse(localStorage.getItem('formState') || '{}');
             
-            // Check if state is not too old (24 hours)
-            if (Date.now() - state.timestamp > 24 * 60 * 60 * 1000) {
-                localStorage.removeItem('indexFormState');
-                return;
+            if (state.selectedOperation) {
+                const operationBtn = document.querySelector(`[data-operation="${state.selectedOperation}"]`);
+                if (operationBtn) {
+                    operationBtn.click();
+                }
             }
-
-            // Restore function selection
+            
             if (state.selectedFunction && elements.funcSelect) {
                 elements.funcSelect.value = state.selectedFunction;
                 handleFunctionChange();
             }
 
-            // Restore show table checkbox
-            if (typeof state.showTable === 'boolean' && elements.showTableCheckbox) {
-                elements.showTableCheckbox.checked = state.showTable;
+            if (state.inputMethod && folderElements.uploadMethodRadio && folderElements.folderMethodRadio) {
+                if (state.inputMethod === 'folder') {
+                    folderElements.folderMethodRadio.checked = true;
+                } else {
+                    folderElements.uploadMethodRadio.checked = true;
+                }
+                handleInputMethodChange();
             }
-
-        } catch (error) {
-            console.warn('Failed to restore form state:', error);
-            localStorage.removeItem('indexFormState');
+        } catch (e) {
+            console.log('Could not restore form state:', e);
         }
     }
-
-    // ข้อมูลคำแนะนำไฟล์สำหรับแต่ละฟังก์ชัน
-    const fileGuidanceData = {
-        "Singulation": {
-            "LOGVIEW": {
-                acceptedFiles: ["TXT","txt"],
-                description: "ไฟล์ข้อมูล Singulatio ",
-                example: " MC 12 .txt"
-            },
-            "singulation_report": {
-                acceptedFiles: ["Excel (.xlsx, .xls)"],
-                description: "ไฟล์ข้อมูล Singulation เพื่อสร้างรายงาน",
-                example: "ตัวอย่าง: singulation_summary.xlsx"
-            }
-        },
-        "Pick & Place": {
-            "PNP_CHANG_TYPE": {
-                acceptedFiles: ["Excel (.xlsx, .xls)", "CSV (.csv)"],
-                description: "ไฟล์ข้อมูล Pick & Place ที่มีคอลั่ม assy_pack_type, bom_no ของแต่ละเดือน",
-                example: "ตัวอย่าง: WF size Apr1-Apr30'23 (UTL1), WF size Aug1-Aug31'23 (UTL1)"
-            },
-            "pnp_validation": {
-                acceptedFiles: ["Excel (.xlsx, .xls)"],
-                description: "ไฟล์เพื่อตรวจสอบความถูกต้องของ Pick & Place",
-                example: "ตัวอย่าง: pnp_validation.xlsx"
-            }
-        },
-        "DA": {
-            "data_analysis": {
-                acceptedFiles: ["Excel (.xlsx, .xls)", "CSV (.csv)"],
-                description: "ไฟล์ข้อมูลใดๆ ที่ต้องการวิเคราะห์ทางสtatistical",
-                example: "ตัวอย่าง: production_data.xlsx, quality_data.csv"
-            },
-            "trend_analysis": {
-                acceptedFiles: ["Excel (.xlsx, .xls)", "CSV (.csv)"],
-                description: "ไฟล์ข้อมูลที่มี timestamp หรือ sequence สำหรับวิเคราะห์แนวโน้ม",
-                example: "ตัวอย่าง: trend_data.xlsx"
-            }
-        },
-        "WB": {
-            "lookup_last_type": {
-                acceptedFiles: ["Excel (.xlsx, .xls)"],
-                description: "ไฟล์ BOM ที่มีคอลัมน์ Part Number และ Last Type",
-                example: "ตัวอย่าง: BOM_list.xlsx"
-            },
-            "validate_bom": {
-                acceptedFiles: ["Excel (.xlsx, .xls)"],
-                description: "ไฟล์ BOM เพื่อตรวจสอบความครบถ้วนและถูกต้อง",
-                example: "ตัวอย่าง: BOM_validation.xlsx"
-            }
-        }
-    };
-
-    // เพิ่มการจัดการเมื่อเลือกฟังก์ชัน
-    document.getElementById('funcSelect').addEventListener('change', function() {
-        const selectedFunction = this.value;
-        const selectedOperation = document.getElementById('selectedOperation').value;
-        const guidanceDiv = document.getElementById('fileGuidance');
-        const guidanceContent = document.getElementById('guidanceContent');
-        
-        if (selectedFunction && selectedOperation && fileGuidanceData[selectedOperation] && fileGuidanceData[selectedOperation][selectedFunction]) {
-            const guidance = fileGuidanceData[selectedOperation][selectedFunction];
-            
-            guidanceContent.innerHTML = `
-                <div class="file-types">
-                    <strong>ประเภทไฟล์ที่รองรับ:</strong>
-                    <ul class="file-list">
-                        ${guidance.acceptedFiles.map(file => `<li>${file}</li>`).join('')}
-                    </ul>
-                </div>
-                <div class="description">
-                    <strong>คำอธิบาย:</strong> ${guidance.description}
-                </div>
-                <div class="example-section">
-                    <strong>ตัวอย่าง:</strong> ${guidance.example}
-                </div>
-            `;
-            
-            guidanceDiv.style.display = 'block';
-        } else {
-            guidanceDiv.style.display = 'none';
-        }
-    });
-
-    function updateFunctionSelect(selectedOperation) {
-        const funcSelect = document.getElementById('funcSelect');
-        const guidanceDiv = document.getElementById('fileGuidance');
-        
-        // ซ่อนคำแนะนำเมื่อเปลี่ยน operation
-        guidanceDiv.style.display = 'none';
-        
-        // ล้างตัวเลือกฟังก์ชัน
-        funcSelect.innerHTML = '<option value="">-- กรุณาเลือกฟังก์ชัน --</option>';
-        
-        if (selectedOperation) {
-            // เปิดใช้งาน function select
-            funcSelect.disabled = false;
-            
-            // ข้อมูล operation-function mapping
-            const operationFunctions = {
-                "Singulation": ["LOGVIEW",],
-                "Pick & Place": ["PNP_CHANG_TYPE",],
-                "DA": ["DIE_ATTACK_AUTO_UPH"],
-                "WB": [""]
-            };
-            
-            // เพิ่มฟังก์ชันที่เกี่ยวข้องกับ operation ที่เลือก
-            if (operationFunctions[selectedOperation]) {
-                operationFunctions[selectedOperation].forEach(func => {
-                    const option = document.createElement('option');
-                    option.value = func;
-                    option.textContent = func;
-                    funcSelect.appendChild(option);
-                });
-            }
-        } else {
-            // ปิดใช้งาน function select
-            funcSelect.disabled = true;
-            funcSelect.innerHTML = '<option value="">-- กรุณาเลือก Operation ก่อน --</option>';
-        }
-    }
-
-    // Global functions for HTML onclick events
-    window.removeFile = function(index) {
-        const dt = new DataTransfer();
-        const files = Array.from(elements.fileInput.files);
-        
-        files.forEach((file, i) => {
-            if (i !== index) {
-                dt.items.add(file);
-            }
-        });
-        
-        elements.fileInput.files = dt.files;
-        handleFileChange();
-        showMessage('ลบไฟล์แล้ว', 'info');
-    };
-
-    // Expose functions for external access
-    window.indexPageAPI = {
-        showMessage: showMessage,
-        validateFiles: validateFiles,
-        getSelectedFiles: () => Array.from(elements.fileInput.files),
-        getCurrentFunction: () => elements.funcSelect.value
-    };
 });

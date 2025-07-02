@@ -1,4 +1,4 @@
-from flask import Flask, request, render_template, redirect, url_for, flash, session, send_file
+from flask import Flask, request, render_template, redirect, url_for, flash, session, send_file, jsonify
 import os
 import importlib
 import tempfile
@@ -129,38 +129,171 @@ def list_functions():
         logger.error(f"Error listing functions: {e}")
     return files
 
+@app.route("/api/folders")
+def get_folders():
+    """Get available folders for file selection"""
+    try:
+        # Define allowed folders (customize as needed)
+        base_paths = [
+            os.path.join(Config.BASE_DIR, "data_logview"),  # For LOGVIEW files
+            os.path.join(Config.BASE_DIR, "Upload"),        # Upload folder
+            os.path.join(Config.BASE_DIR, "data"),          # General data folder
+        ]
+        
+        folders = []
+        for base_path in base_paths:
+            if os.path.exists(base_path):
+                folder_name = os.path.basename(base_path)
+                folders.append({
+                    "name": folder_name,
+                    "path": base_path
+                })
+        
+        return jsonify({
+            "success": True,
+            "folders": folders
+        })
+    
+    except Exception as e:
+        logger.error(f"Error getting folders: {e}")
+        return jsonify({
+            "success": False,
+            "message": str(e)
+        })
+
+@app.route("/api/folder-files")
+def get_folder_files():
+    """Get files in a specific folder"""
+    try:
+        folder_path = request.args.get('path')
+        if not folder_path:
+            return jsonify({
+                "success": False,
+                "message": "ไม่ได้ระบุ path ของโฟลเดอร์"
+            })
+        
+        if not os.path.exists(folder_path):
+            return jsonify({
+                "success": False,
+                "message": "ไม่พบโฟลเดอร์ที่ระบุ"
+            })
+        
+        files = []
+        for filename in os.listdir(folder_path):
+            file_path = os.path.join(folder_path, filename)
+            if os.path.isfile(file_path):
+                try:
+                    file_size = os.path.getsize(file_path)
+                    files.append({
+                        "name": filename,
+                        "size": file_size,
+                        "path": file_path
+                    })
+                except OSError:
+                    continue  # Skip files that can't be accessed
+        
+        # Sort files by name
+        files.sort(key=lambda x: x['name'].lower())
+        
+        return jsonify({
+            "success": True,
+            "files": files
+        })
+    
+    except Exception as e:
+        logger.error(f"Error getting folder files: {e}")
+        return jsonify({
+            "success": False,
+            "message": str(e)
+        })
+
 @app.route("/", methods=["GET", "POST"])
 def index():
     functions = list_functions()
     
     if request.method == "POST":
-        func_name = request.form.get("func_name")
-        files = request.files.getlist("input_files")
-        show_table = request.form.get("show_table") == "on"
-        
-        # Validation
-        if not func_name or func_name == "":
-            flash("กรุณาเลือก function", "error")
-            return redirect(url_for("index"))
-            
-        if not files or files[0].filename == "":
-            flash("กรุณาอัปโหลดไฟล์", "error")
-            return redirect(url_for("index"))
-
-        temp_input = tempfile.mkdtemp()
-        output_dir = os.path.join(Config.BASE_DIR, f"output_{func_name}")
-        
         try:
+            # Get function name from form
+            func_name = request.form.get('func_name')
+            if not func_name:
+                flash("กรุณาเลือกฟังก์ชันที่ต้องการประมวลผล", "error")
+                return redirect(url_for("index"))
+
+            # Check input method
+            input_method = request.form.get('inputMethod', 'upload')
+            temp_input = None
+            
+            if input_method == 'folder':
+                # Handle folder-based file selection
+                selected_folder = request.form.get('selected_folder')
+                selected_files_str = request.form.get('selected_files')
+                
+                if not selected_folder or not selected_files_str:
+                    flash("กรุณาเลือกโฟลเดอร์และไฟล์ที่ต้องการประมวลผล", "error")
+                    return redirect(url_for("index"))
+                
+                selected_filenames = selected_files_str.split(',')
+                
+                # Create temporary directory and copy selected files
+                temp_input = tempfile.mkdtemp()
+                try:
+                    copied_files = 0
+                    for filename in selected_filenames:
+                        if filename.strip():  # Skip empty strings
+                            source_path = os.path.join(selected_folder, filename.strip())
+                            if os.path.exists(source_path):
+                                dest_path = os.path.join(temp_input, filename.strip())
+                                shutil.copy2(source_path, dest_path)
+                                copied_files += 1
+                                logger.info(f"Copied file: {filename.strip()}")
+                    
+                    if copied_files == 0:
+                        flash("ไม่พบไฟล์ที่เลือกในโฟลเดอร์", "error")
+                        if temp_input:
+                            shutil.rmtree(temp_input)
+                        return redirect(url_for("index"))
+                    
+                    logger.info(f"Successfully copied {copied_files} files to temp directory")
+                        
+                except Exception as e:
+                    logger.error(f"Error copying files: {e}")
+                    if temp_input and os.path.exists(temp_input):
+                        shutil.rmtree(temp_input)
+                    raise e
+                    
+            else:
+                # Handle normal file upload
+                files = request.files.getlist("input_files")
+                if not files or all(f.filename == "" for f in files):
+                    flash("กรุณาเลือกไฟล์ก่อน", "error")
+                    return redirect(url_for("index"))
+                
+                # Create temporary directory and save uploaded files
+                temp_input = tempfile.mkdtemp()
+                try:
+                    for f in files:
+                        if f.filename:
+                            file_path = os.path.join(temp_input, f.filename)
+                            f.save(file_path)
+                            logger.info(f"Saved uploaded file: {f.filename}")
+                            
+                except Exception as e:
+                    logger.error(f"Error saving uploaded files: {e}")
+                    if temp_input and os.path.exists(temp_input):
+                        shutil.rmtree(temp_input)
+                    raise e
+            
+            # Continue with processing
+            output_dir = os.path.join(Config.BASE_DIR, f"output_{func_name}")
+            
             # Ensure output directory exists
             os.makedirs(output_dir, exist_ok=True)
             
-            # Save uploaded files
-            for f in files:
-                if f.filename:
-                    file_path = os.path.join(temp_input, f.filename)
-                    f.save(file_path)
-            
             # Import and run function
+            logger.info(f"Running function: {func_name}")
+            logger.info(f"Input directory: {temp_input}")
+            logger.info(f"Output directory: {output_dir}")
+            
             module = importlib.import_module(f"functions.{func_name}")
             module.run(temp_input, output_dir)
             
@@ -176,27 +309,27 @@ def index():
             download_link = url_for("download_file", func_name=func_name, filename=output_files[0])
 
             # Handle table display
-            # ===== การแสดงผลตาราง =====
+            show_table = True
             if show_table:
                 try:
                     # อ่านไฟล์ผลลัพธ์เพื่อแสดงเป็นตาราง
                     df, read_warning = FileUtils.read_file_safely(output_fp)
                     
                     if df is not None:
-                        # แสดงคำเตือนถ้าอ่านไฟล์มีปัญหา (เช่น อ่านเป็น CSV แทน Excel)
+                        # แสดงคำเตือนถ้าอ่านไฟล์มีปัญหา
                         if read_warning:
                             flash(read_warning, "warning")
                         
-                        # เพิ่มเลขลำดับให้แต่ละแถว (เริ่มจาก 1)
+                        # เพิ่มเลขลำดับให้แต่ละแถว
                         df.index = range(1, len(df) + 1)
                         
-                        # สร้างตาราง HTML พร้อม CSS styling
+                        # สร้างตาราง HTML
                         table_html = df.to_html(
-                            classes="result-table table table-striped table-hover",  # CSS classes สำหรับ Bootstrap
-                            table_id="dataTable",                                    # ID สำหรับ JavaScript
-                            index=True,                                             # แสดงเลขลำดับ
-                            border=0,                                               # ไม่ต้องมีขอบ
-                            escape=False                                            # อนุญาต HTML tags
+                            classes="result-table table table-striped table-hover",
+                            table_id="dataTable",
+                            index=True,
+                            border=0,
+                            escape=False
                         )
                         
                         flash("ประมวลผลสำเร็จ", "success")
@@ -206,7 +339,6 @@ def index():
                                              total_records=len(df),
                                              func_name=func_name)
                     else:
-                        # ถ้าอ่านไฟล์ไม่ได้ แสดงข้อความแจ้งเตือน
                         flash(f"ไม่สามารถแสดงตารางได้: {read_warning}", "warning")
                         return render_template("result.html", 
                                              table_html=None, 
@@ -214,7 +346,6 @@ def index():
                                              func_name=func_name)
                         
                 except Exception as e:
-                    # จัดการข้อผิดพลาดในการแสดงตาราง
                     logger.error(f"Error displaying table: {e}")
                     flash(f"ไม่สามารถแสดงตารางได้: {str(e)}", "warning")
                     return render_template("result.html", 
@@ -222,7 +353,6 @@ def index():
                                          download_link=download_link,
                                          func_name=func_name)
             else:
-                # ถ้าไม่ต้องการแสดงตาราง แค่ให้ดาวน์โหลดไฟล์ได้
                 flash("ประมวลผลสำเร็จ สามารถดาวน์โหลดไฟล์ผลลัพธ์ได้", "success")
                 return render_template("result.html", 
                                      table_html=None, 
@@ -230,13 +360,12 @@ def index():
                                      func_name=func_name)
                 
         except Exception as e:
-            # จัดการข้อผิดพลาดทั่วไปของ route
             logger.error(f"Error in index route: {e}")
             flash(f"เกิดข้อผิดพลาด: {str(e)}", "error")
             return redirect(url_for("index"))
         finally:
-            # ลบไฟล์ชั่วคราวเสมอ ไม่ว่าจะสำเร็จหรือล้มเหลว
-            if os.path.exists(temp_input):
+            # ลบไฟล์ชั่วคราวเสมอ
+            if temp_input and os.path.exists(temp_input):
                 shutil.rmtree(temp_input)
     
     # ถ้าเป็น GET request ให้แสดงหน้าหลัก
