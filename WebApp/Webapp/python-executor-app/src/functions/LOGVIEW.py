@@ -6,6 +6,7 @@ from pathlib import Path
 import time
 from datetime import datetime  
 import tempfile
+import shutil
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -335,34 +336,101 @@ def process_multiple_files_complete(input_pattern: str, output_dir: str):
 # ---------- 2. รวม Summary ----------
 
 def load_sec_strip_by_frame(filepath, sheet_name='Processed_Data'):
+    print(f"         📄 อ่านไฟล์: {os.path.basename(filepath)}")
+    
     try:
         df = pd.read_excel(filepath, sheet_name=sheet_name)
-    except ValueError:
-        # ถ้าไม่มีชีท Processed_Data ให้ลองอ่าน Sheet1
-        df = pd.read_excel(filepath, sheet_name='Sheet1')
-    if not all(col in df.columns for col in ['frame', 'speed', 'sec/strip']):
-        raise ValueError("ไม่มีคอลัมน์ที่ต้องการ")
+        print(f"         ✅ อ่าน sheet '{sheet_name}' ได้: {df.shape}")
+    except ValueError as e:
+        print(f"         ⚠️  ไม่พบ sheet '{sheet_name}', ลองอ่าน Sheet1")
+        try:
+            df = pd.read_excel(filepath, sheet_name='Sheet1')
+            print(f"         ✅ อ่าน Sheet1 ได้: {df.shape}")
+        except Exception as e2:
+            print(f"         ❌ ไม่สามารถอ่าน Sheet1: {str(e2)}")
+            raise ValueError(f"ไม่สามารถอ่านไฟล์ได้: {str(e2)}")
+    except Exception as e:
+        print(f"         ❌ ไม่สามารถอ่านไฟล์: {str(e)}")
+        raise
+    
+    print(f"         📋 คอลัมน์ที่มี: {list(df.columns)}")
+    
+    required_cols = ['frame', 'speed', 'sec/strip']
+    missing_cols = [col for col in required_cols if col not in df.columns]
+    
+    if missing_cols:
+        print(f"         ❌ ไม่มีคอลัมน์ที่ต้องการ: {missing_cols}")
+        raise ValueError(f"ไม่มีคอลัมน์ที่ต้องการ: {missing_cols}")
+    
+    print(f"         ✅ มีครบทุกคอลัมน์ที่ต้องการ")
+    
     df['frame'] = df['frame'].astype(str)
     df['speed'] = pd.to_numeric(df['speed'], errors='coerce')
     df['sec/strip'] = pd.to_numeric(df['sec/strip'], errors='coerce')
+    
+    # นับจำนวนข้อมูลก่อนกรอง
+    before_filter = len(df)
     df = df[df['sec/strip'].notna() & df['speed'].notna()]
+    after_filter = len(df)
+    
+    print(f"         📊 ข้อมูลก่อนกรอง: {before_filter} แถว")
+    print(f"         📊 ข้อมูลหลังกรอง: {after_filter} แถว")
+    
+    if df.empty:
+        print(f"         ⚠️  ไม่มีข้อมูลที่ใช้งานได้หลังกรอง")
+    
     return df
 
 def summarize_sec_strip(files_folder, file_list):
+    print(f"   📁 กำลังประมวลผลไฟล์จาก folder: {files_folder}")
+    print(f"   📋 รายการไฟล์: {file_list}")
+    
     data = {}
+    successful_files = 0
+    failed_files = 0
+    
     for filename in file_list:
         filepath = os.path.join(files_folder, filename)
+        print(f"   🔍 ประมวลผล: {filename}")
+        
         try:
+            # ตรวจสอบว่าไฟล์มีอยู่จริง
+            if not os.path.exists(filepath):
+                print(f"   ❌ ไม่พบไฟล์: {filepath}")
+                failed_files += 1
+                continue
+                
             df = load_sec_strip_by_frame(filepath)
+            print(f"      📊 โหลดข้อมูลได้: {df.shape[0]} แถว")
+            
+            if df.empty:
+                print(f"      ⚠️  ไฟล์ว่างเปล่า: {filename}")
+                failed_files += 1
+                continue
+                
             summary = df.groupby(['frame', 'speed'])['sec/strip'].mean()
             summary.index = summary.index.map(lambda x: f"{x[0]}_speed{x[1]}")
             file_key = os.path.splitext(filename)[0]
             data[file_key] = summary
+            
+            print(f"      ✅ สำเร็จ: {len(summary)} กลุ่มข้อมูล")
+            successful_files += 1
+            
         except Exception as e:
-            print(f"ข้ามไฟล์ {filename} : {e}")
+            print(f"      ❌ ข้ามไฟล์ {filename} : {str(e)}")
+            failed_files += 1
             continue
+    
+    print(f"   📊 สรุป: สำเร็จ {successful_files} ไฟล์, ล้มเหลว {failed_files} ไฟล์")
+    
+    if not data:
+        print(f"   ❌ ไม่มีข้อมูลใดๆ จากไฟล์ทั้งหมด")
+        return pd.DataFrame()
+        
     result_df = pd.DataFrame(data)
     result_df = result_df.sort_index()
+    print(f"   ✅ สร้าง result DataFrame: {result_df.shape}")
+    
     return result_df
 
 def save_summary(df, output_path):
@@ -481,17 +549,49 @@ def analyze_and_export_csv_from_df(summary_df, package_path, output_csv):
     if 'Package group' in df_merged.columns:
         print("⚙️ กำหนด Process...")
         df_merged['Process'] = None
+        
+        # ทำความสะอาดข้อมูล Package group
         df_merged['Package group'] = df_merged['Package group'].astype(str).str.strip().str.upper()
         # แปลง SPEED ให้เป็นตัวเลข
         df_merged['SPEED (IPS)'] = pd.to_numeric(df_merged['SPEED (IPS)'], errors='coerce')
 
-        # สร้างคอลัมน์ Process ด้วยเงื่อนไข
-        choices = [
-           (df_merged['SPEED (IPS)'] == 5) & (df_merged['Package group'] == 'SLP'),
-           (df_merged['SPEED (IPS)'] == 3) & (df_merged['Package group'] == 'SLP')
-        ]
-        answer = ['Full Cut', 'Step Cut']
-        df_merged['Process'] = np.select(choices, answer, default=None)
+        # แสดงข้อมูลก่อนกำหนด Process เพื่อ debug
+        print("   🔍 ตรวจสอบข้อมูลก่อนกำหนด Process:")
+        debug_summary = df_merged.groupby(['Package group', 'SPEED (IPS)']).size().reset_index(name='count')
+        for _, row in debug_summary.iterrows():
+            print(f"      - Package group: '{row['Package group']}' | Speed: {row['SPEED (IPS)']} | จำนวน: {row['count']}")
+
+        # ✅ แก้ไขเงื่อนไข Process - ให้ชัดเจนว่าใช้กับ SLP เท่านั้น
+        print("   🔍 กำหนดเงื่อนไข Process สำหรับ SLP เท่านั้น...")
+        
+        # สร้างเงื่อนไขแยกชัดเจน
+        condition_slp_speed5 = (df_merged['SPEED (IPS)'] == 5) & (df_merged['Package group'] == 'SLP')
+        condition_slp_speed3 = (df_merged['SPEED (IPS)'] == 3) & (df_merged['Package group'] == 'SLP')
+        
+        # แสดงจำนวนข้อมูลที่ตรงเงื่อนไข
+        print(f"      - SLP Speed 5: {condition_slp_speed5.sum()} รายการ")
+        print(f"      - SLP Speed 3: {condition_slp_speed3.sum()} รายการ")
+        
+        # กำหนด Process ด้วย .loc[] แทน np.select()
+        df_merged.loc[condition_slp_speed5, 'Process'] = 'Full Cut'
+        df_merged.loc[condition_slp_speed3, 'Process'] = 'Step Cut'
+        
+        # แสดงสรุปการกำหนด Process
+        process_summary = df_merged.groupby(['Package group', 'SPEED (IPS)', 'Process']).size().reset_index(name='count')
+        print("   📊 สรุปการกำหนด Process:")
+        for _, row in process_summary.iterrows():
+            process_value = row['Process'] if pd.notna(row['Process']) else 'None'
+            print(f"      - {row['Package group']} | Speed {row['SPEED (IPS)']} → {process_value} ({row['count']} รายการ)")
+            
+        # ตรวจสอบ QFN ที่อาจได้ Process ผิดพลาด
+        qfn_with_process = df_merged[(df_merged['Package group'] == 'QFN') & (df_merged['Process'].notna())]
+        if not qfn_with_process.empty:
+            print(f"   ⚠️  พบ QFN ที่ได้ Process ผิดพลาด: {len(qfn_with_process)} รายการ")
+            for _, row in qfn_with_process.iterrows():
+                print(f"      - {row['FRAME_STOCK']}: Package group = '{row['Package group']}', Speed = {row['SPEED (IPS)']}, Process = '{row['Process']}'")
+        else:
+            print("   ✅ QFN ไม่มี Process (ถูกต้อง)")
+            
     else:
         print("⚠️  ข้าม Process เนื่องจากไม่มีคอลัมน์ Package group")
         # แปลง SPEED ให้เป็นตัวเลขอย่างน้อย
@@ -618,14 +718,15 @@ def group_and_average_across_frames_unique_frame(df_merged):
         frames_with_data = group_df[group_df['TIME/STRIP'].notna()]['FRAME_STOCK'].tolist()
         frames_without_data = group_df[group_df['TIME/STRIP'].isna()]['FRAME_STOCK'].tolist()
 
-        # ✅ แก้ไข: ใช้ len(values) แทน total_frames_in_group เพื่อนับเฉพาะที่มีข้อมูล
-        group_before_map[group_key] = len(values)  # ← เปลี่ยนตรงนี้
+        # ✅ ใช้ len(values) เพื่อนับเฉพาะที่มีข้อมูล
+        group_before_map[group_key] = len(values)
     
         # บันทึก FRAME_STOCK ที่ไม่มีข้อมูล TIME/STRIP
         for frame in frames_without_data:
             excluded_frames.append(frame)
             excluded_reasons.append(f"กลุ่ม: {group_name} | เหตุผล: ไม่มีข้อมูล TIME/STRIP")
 
+        # ✅ แก้ไข: ไม่ให้ Before_Outlier และ After_Outlier เป็น 0
         if len(values) < 2:
             print(f"❌ กลุ่ม: {group_name}")
             print(f"   📊 Frame Stock ทั้งหมด: {total_frames_in_group} ตัว")
@@ -637,15 +738,15 @@ def group_and_average_across_frames_unique_frame(df_merged):
             # กำหนดค่าเฉลี่ยแม้มีข้อมูลน้อย
             if len(values) == 1:
                 group_avg_map[group_key] = values[0]
-                group_after_map[group_key] = 1
+                group_after_map[group_key] = 1  # ✅ ใช้ค่าเดียวที่มี
                 print(f"   ✅ ใช้ค่าเดียว: {values[0]}")
             elif len(values) == 0:
                 group_avg_map[group_key] = np.nan
-                group_after_map[group_key] = 0
+                group_after_map[group_key] = np.nan  # ✅ เปลี่ยนจาก 0 เป็น NaN
                 print(f"   ⚠️  ไม่มีข้อมูล: ใช้ NaN")
             else:
                 group_avg_map[group_key] = np.mean(values)
-                group_after_map[group_key] = len(values)
+                group_after_map[group_key] = len(values)  # ✅ ใช้จำนวนข้อมูลจริง
                 print(f"   ✅ ใช้ค่าเฉลี่ยโดยไม่กรอง: {np.mean(values)}")
             
             print(f"   📊 จำนวน: {len(values)}/{group_after_map[group_key]} (มีข้อมูล/หลังตัด)")
@@ -662,11 +763,10 @@ def group_and_average_across_frames_unique_frame(df_merged):
             filtered = [v for v in values if lower <= v <= upper]
             outliers = [v for v in values if v < lower or v > upper]
             
-            group_after_map[group_key] = len(filtered)
-            
             if filtered:
                 avg_val = round(np.mean(filtered), 2)
                 group_avg_map[group_key] = avg_val
+                group_after_map[group_key] = len(filtered)  # ✅ ใช้จำนวนข้อมูลที่เหลือหลังกรอง
                 processed_groups += 1
                 total_outliers_removed += len(outliers)
                 
@@ -693,9 +793,9 @@ def group_and_average_across_frames_unique_frame(df_merged):
                 print(f"   📈 ช่วงปกติ: {round(lower, 2)} - {round(upper, 2)}")
                 
                 group_avg_map[group_key] = round(np.mean(values), 2)
-                group_after_map[group_key] = 0
+                group_after_map[group_key] = len(values)  # ✅ เปลี่ยนจาก 0 เป็น len(values) เพราะใช้ค่าเฉลี่ยดิบ
                 print(f"   ⚠️  ใช้ค่าเฉลี่ยดิบ: {round(np.mean(values), 2)}")
-                print(f"   📊 จำนวน: {len(values)}/0 (มีข้อมูล/หลังตัด)")
+                print(f"   📊 จำนวน: {len(values)}/{len(values)} (มีข้อมูล/หลังตัด)")
                 print()
 
     # แสดงสรุป
@@ -720,11 +820,15 @@ def group_and_average_across_frames_unique_frame(df_merged):
     # ฟังก์ชันสำหรับ apply
     def assign_before_count(row):
         key = tuple(row[col] for col in grouping_cols)
-        return group_before_map.get(key, 0)
+        count = group_before_map.get(key, np.nan)
+        # ✅ ไม่ให้เป็น 0 - ใช้ NaN แทน
+        return count if pd.notna(count) and count > 0 else np.nan
 
     def assign_after_count(row):
         key = tuple(row[col] for col in grouping_cols)
-        return group_after_map.get(key, 0)
+        count = group_after_map.get(key, np.nan)
+        # ✅ ไม่ให้เป็น 0 - ใช้ NaN แทน
+        return count if pd.notna(count) and count > 0 else np.nan
 
     def assign_avg(row):
         key = tuple(row[col] for col in grouping_cols)
@@ -734,8 +838,8 @@ def group_and_average_across_frames_unique_frame(df_merged):
         if pd.notna(original_value) and pd.notna(new_value) and abs(original_value - new_value) > 0.01:
             change_type = "📈" if new_value > original_value else "📉"
             diff = abs(new_value - original_value)
-            before_count = group_before_map.get(key, 0)
-            after_count = group_after_map.get(key, 0)
+            before_count = group_before_map.get(key, np.nan)
+            after_count = group_after_map.get(key, np.nan)
             print(f"   {change_type} {row['FRAME_STOCK']}: {original_value} → {new_value} (เปลี่ยน {round(diff, 2)}) [{before_count}/{after_count}]")
             
         return new_value
@@ -765,41 +869,79 @@ def run(input_path, output_dir):
     with tempfile.TemporaryDirectory() as temp_dir:
         # ประมวลผลในไฟล์ชั่วคราว
         process_multiple_files_complete(input_path, temp_dir)
-        # บันทึกเฉพาะ Summary ใน output_dir
-        after_files = set(f for f in os.listdir(temp_dir) if f.lower().endswith('.xlsx'))
-        new_files = list(after_files - before_files)
+        # หาไฟล์ใหม่ที่สร้างขึ้น
+        temp_files = set(f for f in os.listdir(temp_dir) if f.lower().endswith('.xlsx'))
         
-        if not new_files:
+        if not temp_files:
             print(" ไม่พบไฟล์ .xlsx ใหม่")
             return
 
-        print(f" สร้างไฟล์ใหม่ {len(new_files)} ไฟล์")
+        print(f" สร้างไฟล์ใหม่ {len(temp_files)} ไฟล์")
+        
+        # คัดลอกไฟล์จาก temp_dir ไปยัง output_dir
+        import shutil
+        new_files = []
+        for filename in temp_files:
+            src = os.path.join(temp_dir, filename)
+            dst = os.path.join(output_dir, filename)
+            shutil.copy2(src, dst)
+            new_files.append(filename)
+            print(f"   ✅ คัดลอก: {filename}")
+    
+    # ตรวจสอบไฟล์ที่คัดลอกมาแล้ว
+    if not new_files:
+        print(" ไม่สามารถคัดลอกไฟล์ได้")
+        return
 
     # 2. สร้าง summary DataFrame
-    print(" ขั้นตอนที่ 2: สร้าง summary...")
-    summary_df = summarize_sec_strip(output_dir, new_files)
-    print(f" ข้อมูล summary: {summary_df.shape}")
+    print("📊 ขั้นตอนที่ 2: สร้าง summary...")
+    try:
+        summary_df = summarize_sec_strip(output_dir, new_files)
+        print(f"   ✅ ข้อมูล summary: {summary_df.shape}")
+        
+        if summary_df.empty:
+            print("   ❌ Summary DataFrame ว่างเปล่า")
+            return
+            
+    except Exception as e:
+        print(f"   ❌ เกิดข้อผิดพลาดในการสร้าง summary: {str(e)}")
+        return
     
     # 3. ตรวจสอบไฟล์ package
-    print(" ขั้นตอนที่ 3: ตรวจสอบไฟล์ package...")
+    print("📊 ขั้นตอนที่ 3: ตรวจสอบไฟล์ package...")
     package_path = os.path.join(BASE_DIR, "..", "Upload", "export package and frame stock Rev.04.xlsx")
     package_path = os.path.abspath(package_path)
     
+    print(f"   📁 ตรวจสอบ package path: {package_path}")
+    
     if not os.path.exists(package_path):
-        print(" ไม่พบไฟล์ export package and frame stock Rev.04.xlsx ใน Upload")
+        print("   ❌ ไม่พบไฟล์ export package and frame stock Rev.04.xlsx ใน Upload")
+        print(f"   📁 ตรวจสอบ directory: {os.path.dirname(package_path)}")
+        if os.path.exists(os.path.dirname(package_path)):
+            upload_files = os.listdir(os.path.dirname(package_path))
+            print(f"   📋 ไฟล์ใน Upload folder: {upload_files}")
         return
+    else:
+        print(f"   ✅ พบไฟล์ package: {package_path}")
     
     # 4. สร้างไฟล์ Summary.csv ด้วย timestamp
-    print(" ขั้นตอนที่ 4: สร้างไฟล์ CSV สุดท้าย...")
+    print("📊 ขั้นตอนที่ 4: สร้างไฟล์ CSV สุดท้าย...")
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_csv = os.path.join(output_dir, f"Summary_{timestamp}.csv")
     
-    # ✅ ฟังก์ชันนี้จะเรียกใช้ group_and_average_across_frames_unique_frame ในขั้นตอนสุดท้าย
-    final_df = analyze_and_export_csv_from_df(summary_df, package_path, output_csv)
-    
-    print(f" ประมวลผลเสร็จสิ้น!")
-    print(f" ไฟล์ผลลัพธ์: {output_csv}")
-    print(f" ข้อมูลสุดท้าย: {final_df.shape[0]} แถว")
+    try:
+        # ✅ ฟังก์ชันนี้จะเรียกใช้ group_and_average_across_frames_unique_frame ในขั้นตอนสุดท้าย
+        final_df = analyze_and_export_csv_from_df(summary_df, package_path, output_csv)
+        
+        print(f"🎉 ประมวลผลเสร็จสิ้น!")
+        print(f"   📄 ไฟล์ผลลัพธ์: {output_csv}")
+        print(f"   📊 ข้อมูลสุดท้าย: {final_df.shape[0]} แถว")
+        
+    except Exception as e:
+        print(f"   ❌ เกิดข้อผิดพลาดในการสร้าง CSV: {str(e)}")
+        import traceback
+        print(f"   🔍 รายละเอียด: {traceback.format_exc()}")
+        return
 
 
 
