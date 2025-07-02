@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}IE Function Portal{% endblock %}
+
+{% block css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/index.css') }}">
+{% endblock %}
+
+{% block content %}
+    <div class="main-container">
+        <div class="header">
+            <i class="fas fa-cogs icon"></i>
+            <h1>IE Function</h1>
+        </div>
+
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            <div class="alert-messages">
+              {% for message in messages %}
+                <div class="alert">
+                  <i class="fas fa-info-circle"></i> {{ message }}
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+
+        <div class="form-container">
+            <form method="post" enctype="multipart/form-data" id="mainForm">
+                <div class="form-group">
+                    <label class="section-label">
+                        <i class="fas fa-tasks"></i>เลือก Operation:
+                    </label>
+                    <div class="operation-buttons">
+                        <button type="button" class="operation-btn" data-operation="Singulation">
+                            <i class="fas fa-database"></i>
+                            <span>Singulation</span>
+                        </button>
+                        <button type="button" class="operation-btn" data-operation="Pick & Place">
+                            <i class="fas fa-file-alt"></i>
+                            <span>Pick & Places</span>
+                        </button>
+                        <button type="button" class="operation-btn" data-operation="DA">
+                            <i class="fas fa-chart-line"></i>
+                            <span>DA</span>
+                        </button>
+                        <button type="button" class="operation-btn" data-operation="WB">
+                            <i class="fas fa-list-ul"></i>
+                            <span>WB</span>
+                        </button>
+                    </div>
+                    <input type="hidden" name="operation" id="selectedOperation" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="funcSelect">
+                        <i class="fas fa-function"></i>เลือกฟังก์ชัน:
+                    </label>
+                    <select name="func_name" id="funcSelect" class="form-control" required disabled>
+                        <option value="">-- กรุณาเลือก Operation ก่อน --</option>
+                        {% for func in functions %}
+                        <option value="{{ func }}">{{ func }}</option>
+                        {% endfor %}
+                    </select>
+                    
+                    <!-- คำแนะนำไฟล์ -->
+                    <div id="fileGuidance" class="file-guidance" style="display:none;">
+                        <div class="guidance-header">
+                            <i class="fas fa-info-circle"></i>
+                            <span>คำแนะนำไฟล์สำหรับฟังก์ชันที่เลือก</span>
+                        </div>
+                        <div id="guidanceContent" class="guidance-content">
+                            <!-- เนื้อหาจะถูกเพิ่มด้วย JavaScript -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="fileInput">
+                        <i class="fas fa-upload"></i>อัปโหลดไฟล์ (เลือกได้หลายไฟล์):
+                    </label>
+                    <input type="file" name="input_files" id="fileInput" class="form-control" multiple>
+                </div>
+
+                <div class="form-group">
+                    <div class="checkbox-container">
+                        <input type="checkbox" name="show_table" id="showTable" checked>
+                        <label for="showTable">
+                            <i class="fas fa-table"></i>แสดงผลลัพธ์บนเว็บ
+                        </label>
+                    </div>
+                </div>
+
+                <button type="submit" class="submit-btn">
+                    <i class="fas fa-play"></i> เริ่มประมวลผล
+                </button>
+            </form>
+
+            <!-- ลิงก์ค้นหา Last_type -->
+            <a href="{{ url_for('lookup_last_type_route') }}" id="lookupLastTypeLink" class="feature-btn" style="display:none;">
+                <i class="fas fa-search"></i>ค้นหา Last_type จาก BOM
+            </a>
+        </div>
+
+        <div id="loading" class="loading">
+            <div class="loading-spinner"></div>
+            <div class="loading-content">
+                <i class="fas fa-cog fa-spin"></i> กำลังประมวลผล กรุณารอสักครู่...
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block js %}
+<script src="{{ url_for('static', filename='js/index.js') }}"></script>
+{% endblock %}
