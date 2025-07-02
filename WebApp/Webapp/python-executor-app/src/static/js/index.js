@@ -464,7 +464,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const operationFunctions = {
                 "Singulation": ["LOGVIEW",],
                 "Pick & Place": ["PNP_CHANG_TYPE",],
-                "DA": [""],
+                "DA": ["DIE_ATTACK_AUTO_UPH"],
                 "WB": [""]
             };
             

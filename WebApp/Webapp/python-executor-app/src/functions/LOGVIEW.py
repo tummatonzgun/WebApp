@@ -5,6 +5,7 @@ import numpy as np
 from pathlib import Path
 import time
 from datetime import datetime  
+import tempfile
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -390,8 +391,9 @@ def filtered_mean(lst):
 
 # กำหนด mapping เงื่อนไข Package group → Lead frame
 MAPPING = {
-    ('QFN', '5.0'): 'CU',
-    ('QFN', '4.0'): 'PPF',
+    ('QFN', '5.0'): 'Copper ',
+    ('QFN', '4.0'): 'Selective PPF',
+    ('QFN', '3.0'): 'Full PPF',
 }
 
 def analyze_and_export_csv(summary_path, package_path, output_csv):
@@ -466,10 +468,10 @@ def analyze_and_export_csv_from_df(summary_df, package_path, output_csv):
     )
     
     # แก้ไขการใช้ MAPPING (เฉพาะเมื่อมีคอลัมน์ที่เกี่ยวข้อง)
-    if 'Lead frame type by frame stock' in df_merged.columns and 'Package group' in df_merged.columns:
-        print("🔧 ปรับปรุง Lead frame ตาม mapping...")
-        df_merged['Lead frame type by frame stock'] = df_merged.apply(
-            lambda row: MAPPING.get((str(row['Package group']), str(row['SPEED (IPS)'])), row['Lead frame type by frame stock']),
+    if 'Frame type ' in df_merged.columns and 'Package group' in df_merged.columns:
+        print("🔧 ปรับปรุง Frame type ตาม mapping...")
+        df_merged['Frame type '] = df_merged.apply(
+            lambda row: MAPPING.get((str(row['Package group']), str(row['SPEED (IPS)'])), row['Frame type ']),
             axis=1
         )
     else:
@@ -760,16 +762,18 @@ def run(input_path, output_dir):
     print("📊 ขั้นตอนที่ 1: ประมวลผลไฟล์ input...")
     before_files = set(f for f in os.listdir(output_dir) if f.lower().endswith('.xlsx'))
     
-    process_multiple_files_complete(input_path, output_dir)
-    
-    after_files = set(f for f in os.listdir(output_dir) if f.lower().endswith('.xlsx'))
-    new_files = list(after_files - before_files)
-    
-    if not new_files:
-        print(" ไม่พบไฟล์ .xlsx ใหม่")
-        return
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # ประมวลผลในไฟล์ชั่วคราว
+        process_multiple_files_complete(input_path, temp_dir)
+        # บันทึกเฉพาะ Summary ใน output_dir
+        after_files = set(f for f in os.listdir(temp_dir) if f.lower().endswith('.xlsx'))
+        new_files = list(after_files - before_files)
+        
+        if not new_files:
+            print(" ไม่พบไฟล์ .xlsx ใหม่")
+            return
 
-    print(f" สร้างไฟล์ใหม่ {len(new_files)} ไฟล์")
+        print(f" สร้างไฟล์ใหม่ {len(new_files)} ไฟล์")
 
     # 2. สร้าง summary DataFrame
     print(" ขั้นตอนที่ 2: สร้าง summary...")
