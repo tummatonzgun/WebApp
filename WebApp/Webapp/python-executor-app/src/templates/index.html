@@ -7,147 +7,184 @@
 {% endblock %}
 
 {% block content %}
-    <div class="main-container">
-        <div class="header">
-            <i class="fas fa-cogs icon"></i>
+<div class="container">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="header-content">
+            <i class="fas fa-cogs header-icon"></i>
             <h1>IE Function</h1>
+            <p class="header-subtitle"></p>
         </div>
+    </div>
 
-        {% with messages = get_flashed_messages() %}
-          {% if messages %}
-            <div class="alert-messages">
-              {% for message in messages %}
-                <div class="alert">
-                  <i class="fas fa-info-circle"></i> {{ message }}
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="alert-messages">
+        {% for category, message in messages %}
+        <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible">
+            <i class="fas fa-{{ 'exclamation-triangle' if category == 'error' else 'info-circle' }}"></i>
+            {{ message }}
+            <button type="button" class="btn-close" onclick="this.parentElement.remove()">×</button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    <!-- Main Form -->
+    <div class="form-container">
+        <form method="post" enctype="multipart/form-data" id="mainForm" class="main-form">
+            
+            <!-- Operation Selection -->
+            <div class="form-group">
+                <label class="form-label">
+                    <i class="fas fa-tasks"></i> เลือก Operation:
+                </label>
+                <div class="operation-grid">
+                    <button type="button" class="operation-btn" data-operation="Singulation">
+                        <div class="icon">
+                            <i class=""></i>
+                        </div>
+                        <div class="title">Singulation</div>
+                        <div class="description"></div>
+                    </button>
+                    <button type="button" class="operation-btn" data-operation="Pick & Place">
+                        <div class="icon">
+                            <i class=""></i>
+                        </div>
+                        <div class="title">Pick & Place</div>
+                        <div class="description"></div>
+                    </button>
+                    <button type="button" class="operation-btn" data-operation="DA">
+                        <div class="icon">
+                            <i class=""></i>
+                        </div>
+                        <div class="title">DA</div>
+                        <div class="description"></div>
+                    </button>
+                    <button type="button" class="operation-btn" data-operation="WB">
+                        <div class="icon">
+                            <i class=""></i>
+                        </div>
+                        <div class="title">WB</div>
+                        <div class="description"></div>
+                    </button>
                 </div>
-              {% endfor %}
+                <input type="hidden" name="operation" id="selectedOperation" required>
             </div>
-          {% endif %}
-        {% endwith %}
 
-        <div class="form-container">
-            <form method="post" enctype="multipart/form-data" id="mainForm">
-                <div class="form-group">
-                    <label class="section-label">
-                        <i class="fas fa-tasks"></i>เลือก Operation:
-                    </label>
-                    <div class="operation-buttons">
-                        <button type="button" class="operation-btn" data-operation="Singulation">
-                            <i class="fas fa-database"></i>
-                            <span>Singulation</span>
-                        </button>
-                        <button type="button" class="operation-btn" data-operation="Pick & Place">
-                            <i class="fas fa-file-alt"></i>
-                            <span>Pick & Places</span>
-                        </button>
-                        <button type="button" class="operation-btn" data-operation="DA">
-                            <i class="fas fa-chart-line"></i>
-                            <span>DA</span>
-                        </button>
-                        <button type="button" class="operation-btn" data-operation="WB">
-                            <i class="fas fa-list-ul"></i>
-                            <span>WB</span>
-                        </button>
+            <!-- Function Selection -->
+            <div class="form-group">
+                <label for="funcSelect" class="form-label">
+                    <i class="fas fa-cogs"></i> เลือกฟังก์ชัน:
+                </label>
+                <select name="func_name" id="funcSelect" class="form-control" required>
+                    <option value="">เลือกฟังก์ชัน</option>
+                </select>
+            </div>
+
+            <!-- File Input Selection -->
+            <div class="form-group">
+                <label class="form-label">
+                    <i class="fas fa-file-upload"></i> เลือกการจัดการไฟล์:
+                </label>
+                
+                <!-- File Input Method Selection -->
+                <div class="input-method-selector">
+                    <div class="method-option">
+                        <input type="radio" id="uploadMethod" name="inputMethod" value="upload" checked>
+                        <label for="uploadMethod">
+                            <i class="fas fa-upload"></i> อัปโหลดไฟล์
+                        </label>
                     </div>
-                    <input type="hidden" name="operation" id="selectedOperation" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="funcSelect">
-                        <i class="fas fa-cogs"></i> เลือกฟังก์ชัน:
-                    </label>
-                    <select name="func_name" id="funcSelect" class="form-control" required>
-                        <option value="">เลือกฟังก์ชัน</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label for="fileInput">
-                        <i class="fas fa-upload"></i>เลือกการจัดการ
-                    </label>
-                    
-                    <!-- File Input Method Selection -->
-                    <div class="input-method-selector">
-                        <div class="method-option">
-                            <input type="radio" id="uploadMethod" name="inputMethod" value="upload" checked>
-                            <label for="uploadMethod">
-                                <i class="fas fa-upload"></i> อัปโหลดไฟล์
-                            </label>
-                        </div>
-                        <div class="method-option">
-                            <input type="radio" id="folderMethod" name="inputMethod" value="folder">
-                            <label for="folderMethod">
-                                <i class="fas fa-folder"></i> เลือกจากโฟลเดอร์
-                            </label>
-                        </div>
-                    </div>
-
-                    <!-- Upload File Section -->
-                    <div id="uploadSection" class="input-section">
-                        <input type="file" name="input_files" id="fileInput" class="form-control" multiple>
-                    </div>
-
-                    <!-- Folder File Selection Section -->
-                    <div id="folderSection" class="input-section" style="display: none;">
-                        <div class="folder-controls">
-                            <select id="folderSelect" class="form-control">
-                                <option value="">-- เลือกโฟลเดอร์ --</option>
-                            </select>
-                            <button type="button" id="refreshFolders" class="refresh-btn">
-                                <i class="fas fa-sync-alt"></i> รีเฟรช
-                            </button>
-                        </div>
-                        
-                        <div id="fileListContainer" class="file-list-container" style="display: none;">
-                            <div class="file-list-header">
-                                <h4>ไฟล์ในโฟลเดอร์:</h4>
-                                <div class="file-actions">
-                                    <button type="button" id="selectAllFiles" class="action-btn">
-                                        <i class="fas fa-check-square"></i> เลือกทั้งหมด
-                                    </button>
-                                    <button type="button" id="clearSelection" class="action-btn">
-                                        <i class="fas fa-times"></i> ยกเลิกการเลือก
-                                    </button>
-                                </div>
-                            </div>
-                            <div id="fileList" class="file-list">
-                                <!-- Files will be populated here -->
-                            </div>
-                        </div>
-                        
-                        <!-- Hidden input for selected files -->
-                        <input type="hidden" name="selected_files" id="selectedFiles">
-                        <input type="hidden" name="selected_folder" id="selectedFolder">
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <div class="checkbox-container">
-                        <input type="checkbox" name="show_table" id="showTable" checked>
-                        <label for="showTable">
-                            <i class="fas fa-table"></i>แสดงผลลัพธ์บนเว็บ
+                    <div class="method-option">
+                        <input type="radio" id="folderMethod" name="inputMethod" value="folder">
+                        <label for="folderMethod">
+                            <i class="fas fa-folder"></i> เลือกจากโฟลเดอร์
                         </label>
                     </div>
                 </div>
 
-                <button type="submit" class="submit-btn">
+                <!-- Upload File Section -->
+                <div id="uploadSection" class="input-section">
+                    <input type="file" name="input_files" id="fileInput" class="form-control" multiple 
+                           accept=".xlsx,.xls,.csv,.txt">
+                </div>
+
+                <!-- Folder File Selection Section -->
+                <div id="folderSection" class="input-section" style="display: none;">
+                    <div class="folder-controls">
+                        <select id="folderSelect" class="form-control">
+                            <option value="">-- เลือกโฟลเดอร์ --</option>
+                        </select>
+                        <button type="button" id="refreshFolders" class="refresh-btn">
+                            <i class="fas fa-sync-alt"></i> รีเฟรช
+                        </button>
+                    </div>
+                    
+                    <div id="fileListContainer" class="file-list-container" style="display: none;">
+                        <div class="file-list-header">
+                            <h4>ไฟล์ในโฟลเดอร์:</h4>
+                            <div class="file-actions">
+                                <button type="button" id="selectAllFiles" class="action-btn">
+                                    <i class="fas fa-check-square"></i> เลือกทั้งหมด
+                                </button>
+                                <button type="button" id="clearSelection" class="action-btn">
+                                    <i class="fas fa-times"></i> ยกเลิกการเลือก
+                                </button>
+                            </div>
+                        </div>
+                        <div id="fileList" class="file-list">
+                            <!-- Files will be populated here dynamically -->
+                        </div>
+                    </div>
+                    
+                    <!-- Hidden inputs for selected files -->
+                    <input type="hidden" name="selected_files" id="selectedFiles">
+                    <input type="hidden" name="selected_folder" id="selectedFolder">
+                </div>
+            </div>
+
+            <!-- Options -->
+            <div class="form-group">
+                <div class="form-options">
+                    <div class="option-item">
+                        <input type="checkbox" name="show_table" id="showTable" checked>
+                        <label for="showTable">
+                            <i class="fas fa-table"></i> แสดงผลลัพธ์บนเว็บ
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary btn-lg">
                     <i class="fas fa-play"></i> เริ่มประมวลผล
                 </button>
-            </form>
+            </div>
+        </form>
 
-            <!-- ลิงก์ค้นหา Last_type -->
-            <a href="{{ url_for('lookup_last_type_route') }}" id="lookupLastTypeLink" class="feature-btn" style="display:none;">
-                <i class="fas fa-search"></i>ค้นหา Last_type จาก BOM
+        <!-- Additional Features -->
+        <div class="additional-features">
+            <a href="{{ url_for('lookup_last_type_route') }}" id="lookupLastTypeLink" 
+               class="btn btn-secondary" style="display: none;">
+                <i class="fas fa-search"></i> ค้นหา Last_type จาก BOM
             </a>
         </div>
+    </div>
 
-        <div id="loading" class="loading">
-            <div class="loading-spinner"></div>
-            <div class="loading-content">
-                <i class="fas fa-cog fa-spin"></i> กำลังประมวลผล กรุณารอสักครู่...
+    <!-- Loading Indicator -->
+    <div id="loading" class="loading">
+        <div class="loading-content">
+            <div class="loading-spinner">
+                <i class="fas fa-cog fa-spin"></i>
             </div>
+            <p>กำลังประมวลผล กรุณารอสักครู่...</p>
         </div>
     </div>
+</div>
 {% endblock %}
 
 {% block js %}

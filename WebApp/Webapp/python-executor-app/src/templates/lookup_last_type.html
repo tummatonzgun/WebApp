@@ -7,29 +7,40 @@
 {% endblock %}
 
 {% block content %}
-<div class="main-container">
-    <div class="header">
-        <i class="fas fa-search icon"></i>
-        <h1>ค้นหา Last_type จาก BOM</h1>
-        <p>อัปโหลดไฟล์ BOM เพื่อค้นหาข้อมูล Last_type อัตโนมัติ</p>
-    </div>
-
-    <div class="navigation">
-        <a href="{{ url_for('index') }}" class="nav-btn">
-            <i class="fas fa-home"></i>กลับหน้าแรก
-        </a>
-    </div>
-
-    {% with messages = get_flashed_messages() %}
-      {% if messages %}
-        <div class="alert-messages">
-          {% for message in messages %}
-            <div class="alert">
-              <i class="fas fa-exclamation-circle"></i> {{ message }}
-            </div>
-          {% endfor %}
+<div class="container">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="header-content">
+            <i class="fas fa-search header-icon"></i>
+            <h1>ค้นหา Last_type จาก BOM</h1>
+            <p class="header-subtitle">อัปโหลดไฟล์ BOM เพื่อค้นหาข้อมูล Last_type อัตโนมัติ</p>
         </div>
-      {% endif %}
+    </div>
+
+    <!-- Navigation -->
+    <div class="form-container">
+        <div class="navigation-section">
+            <div class="nav-group">
+                <a href="{{ url_for('index') }}" class="btn btn-secondary">
+                    <i class="fas fa-home"></i> กลับหน้าแรก
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="alert-messages">
+        {% for category, message in messages %}
+        <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible">
+            <i class="fas fa-{{ 'exclamation-triangle' if category == 'error' else 'info-circle' }}"></i>
+            {{ message }}
+            <button type="button" class="btn-close" onclick="this.parentElement.remove()">×</button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
     {% endwith %}
 
     <div class="form-container">
