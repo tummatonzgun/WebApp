@@ -436,3 +436,115 @@
 2025-07-03 11:45:54,441 - INFO - [_internal.py:97] -  * Restarting with stat
 2025-07-03 11:45:55,036 - WARNING - [_internal.py:97] -  * Debugger is active!
 2025-07-03 11:45:55,040 - INFO - [_internal.py:97] -  * Debugger PIN: 588-859-978
+2025-07-03 15:12:31,149 - INFO - [app.py:907] -    Local:   http://127.0.0.1:80
+2025-07-03 15:12:31,149 - INFO - [app.py:908] -    Network: http://10.153.88.147:80
+2025-07-03 15:12:31,149 - INFO - [app.py:909] -    Debug:   True
+2025-07-03 15:12:31,150 - INFO - [app.py:910] -    Functions: ['DIE_ATTACK_AUTO_UPH', 'LOGVIEW', 'PNP_AUTO_UPH', 'PNP_CHANG_TYPE', 'WB_AUTO_UPH']
+2025-07-03 15:12:31,181 - INFO - [_internal.py:97] - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:80
+ * Running on http://10.153.88.147:80
+2025-07-03 15:12:31,181 - INFO - [_internal.py:97] - [33mPress CTRL+C to quit[0m
+2025-07-03 15:12:31,183 - INFO - [_internal.py:97] -  * Restarting with stat
+2025-07-03 15:12:31,900 - INFO - [app.py:907] -    Local:   http://127.0.0.1:80
+2025-07-03 15:12:31,900 - INFO - [app.py:908] -    Network: http://10.153.88.147:80
+2025-07-03 15:12:31,900 - INFO - [app.py:909] -    Debug:   True
+2025-07-03 15:12:31,901 - INFO - [app.py:910] -    Functions: ['DIE_ATTACK_AUTO_UPH', 'LOGVIEW', 'PNP_AUTO_UPH', 'PNP_CHANG_TYPE', 'WB_AUTO_UPH']
+2025-07-03 15:12:31,914 - WARNING - [_internal.py:97] -  * Debugger is active!
+2025-07-03 15:12:31,916 - INFO - [_internal.py:97] -  * Debugger PIN: 588-859-978
+2025-07-03 15:12:35,708 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:12:35] "GET / HTTP/1.1" 200 -
+2025-07-03 15:12:35,826 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:12:35] "[36mGET /static/css/index.css HTTP/1.1[0m" 304 -
+2025-07-03 15:12:35,843 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:12:35] "GET /static/css/style.css HTTP/1.1" 200 -
+2025-07-03 15:12:35,847 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:12:35] "[36mGET /static/js/index.js HTTP/1.1[0m" 304 -
+2025-07-03 15:12:35,847 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:12:35] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
+2025-07-03 15:12:35,927 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:12:35] "GET /api/folders HTTP/1.1" 200 -
+2025-07-03 15:12:47,175 - INFO - [app.py:303] - Saved uploaded file: APL_utl1_2024Q1_DIE_ATTACH_MAP.xlsx
+2025-07-03 15:12:47,175 - INFO - [app.py:260] - Executing function: DIE_ATTACK_AUTO_UPH
+2025-07-03 15:12:47,175 - INFO - [app.py:261] - Input directory: C:\Users\41800558\AppData\Local\Temp\tmpcsurg35g
+2025-07-03 15:12:47,176 - INFO - [app.py:262] - Output directory: c:\Users\41800558\Documents\GitHub\WebApp\WebApp\Webapp\python-executor-app\src\output_DIE_ATTACK_AUTO_UPH
+2025-07-03 15:13:00,441 - INFO - [app.py:379] - Cleaned up temporary directory: C:\Users\41800558\AppData\Local\Temp\tmpcsurg35g
+2025-07-03 15:13:00,443 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:13:00] "POST / HTTP/1.1" 200 -
+2025-07-03 15:13:00,461 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:13:00] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+2025-07-03 15:13:00,464 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:13:00] "GET /static/css/result.css HTTP/1.1" 200 -
+2025-07-03 15:13:00,467 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:13:00] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
+2025-07-03 15:13:00,479 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:13:00] "[36mGET /static/js/result.js HTTP/1.1[0m" 304 -
+2025-07-03 15:13:22,738 - INFO - [_internal.py:97] -  * Detected change in 'c:\\Users\\41800558\\Documents\\GitHub\\WebApp\\WebApp\\Webapp\\python-executor-app\\src\\functions\\DIE_ATTACK_AUTO_UPH.py', reloading
+2025-07-03 15:13:22,892 - INFO - [_internal.py:97] -  * Restarting with stat
+2025-07-03 15:13:23,542 - INFO - [app.py:907] -    Local:   http://127.0.0.1:80
+2025-07-03 15:13:23,542 - INFO - [app.py:908] -    Network: http://10.153.88.147:80
+2025-07-03 15:13:23,542 - INFO - [app.py:909] -    Debug:   True
+2025-07-03 15:13:23,542 - INFO - [app.py:910] -    Functions: ['DIE_ATTACK_AUTO_UPH', 'LOGVIEW', 'PNP_AUTO_UPH', 'PNP_CHANG_TYPE', 'WB_AUTO_UPH']
+2025-07-03 15:13:23,555 - WARNING - [_internal.py:97] -  * Debugger is active!
+2025-07-03 15:13:23,557 - INFO - [_internal.py:97] -  * Debugger PIN: 588-859-978
+2025-07-03 15:13:25,710 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:13:25] "GET / HTTP/1.1" 200 -
+2025-07-03 15:13:25,822 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:13:25] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+2025-07-03 15:13:25,847 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:13:25] "[36mGET /static/css/index.css HTTP/1.1[0m" 304 -
+2025-07-03 15:13:25,851 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:13:25] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
+2025-07-03 15:13:25,852 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:13:25] "[36mGET /static/js/index.js HTTP/1.1[0m" 304 -
+2025-07-03 15:13:25,958 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:13:25] "GET /api/folders HTTP/1.1" 200 -
+2025-07-03 15:13:30,724 - INFO - [app.py:303] - Saved uploaded file: APL_utl1_2024Q1_DIE_ATTACH_MAP.xlsx
+2025-07-03 15:13:30,724 - INFO - [app.py:260] - Executing function: DIE_ATTACK_AUTO_UPH
+2025-07-03 15:13:30,724 - INFO - [app.py:261] - Input directory: C:\Users\41800558\AppData\Local\Temp\tmpweuuxndg
+2025-07-03 15:13:30,724 - INFO - [app.py:262] - Output directory: c:\Users\41800558\Documents\GitHub\WebApp\WebApp\Webapp\python-executor-app\src\output_DIE_ATTACK_AUTO_UPH
+2025-07-03 15:13:31,297 - INFO - [app.py:379] - Cleaned up temporary directory: C:\Users\41800558\AppData\Local\Temp\tmpweuuxndg
+2025-07-03 15:13:31,300 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:13:31] "POST / HTTP/1.1" 200 -
+2025-07-03 15:13:31,322 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:13:31] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+2025-07-03 15:13:31,329 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:13:31] "[36mGET /static/css/result.css HTTP/1.1[0m" 304 -
+2025-07-03 15:13:31,330 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:13:31] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
+2025-07-03 15:13:31,331 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:13:31] "[36mGET /static/js/result.js HTTP/1.1[0m" 304 -
+2025-07-03 15:16:11,135 - INFO - [_internal.py:97] -  * Detected change in 'c:\\Users\\41800558\\Documents\\GitHub\\WebApp\\WebApp\\Webapp\\python-executor-app\\src\\functions\\DIE_ATTACK_AUTO_UPH.py', reloading
+2025-07-03 15:16:11,249 - INFO - [_internal.py:97] -  * Restarting with stat
+2025-07-03 15:16:11,963 - INFO - [app.py:907] -    Local:   http://127.0.0.1:80
+2025-07-03 15:16:11,963 - INFO - [app.py:908] -    Network: http://10.153.88.147:80
+2025-07-03 15:16:11,963 - INFO - [app.py:909] -    Debug:   True
+2025-07-03 15:16:11,963 - INFO - [app.py:910] -    Functions: ['DIE_ATTACK_AUTO_UPH', 'LOGVIEW', 'PNP_AUTO_UPH', 'PNP_CHANG_TYPE', 'WB_AUTO_UPH']
+2025-07-03 15:16:11,979 - WARNING - [_internal.py:97] -  * Debugger is active!
+2025-07-03 15:16:11,981 - INFO - [_internal.py:97] -  * Debugger PIN: 588-859-978
+2025-07-03 15:16:15,197 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:16:15] "GET / HTTP/1.1" 200 -
+2025-07-03 15:16:15,323 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:16:15] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+2025-07-03 15:16:15,344 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:16:15] "[36mGET /static/js/index.js HTTP/1.1[0m" 304 -
+2025-07-03 15:16:15,344 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:16:15] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
+2025-07-03 15:16:15,345 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:16:15] "[36mGET /static/css/index.css HTTP/1.1[0m" 304 -
+2025-07-03 15:16:15,371 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:16:15] "GET /api/folders HTTP/1.1" 200 -
+2025-07-03 15:16:20,309 - INFO - [app.py:303] - Saved uploaded file: APL_utl1_2024Q1_DIE_ATTACH_MAP.xlsx
+2025-07-03 15:16:20,309 - INFO - [app.py:260] - Executing function: DIE_ATTACK_AUTO_UPH
+2025-07-03 15:16:20,309 - INFO - [app.py:261] - Input directory: C:\Users\41800558\AppData\Local\Temp\tmpdj4enmxj
+2025-07-03 15:16:20,309 - INFO - [app.py:262] - Output directory: c:\Users\41800558\Documents\GitHub\WebApp\WebApp\Webapp\python-executor-app\src\output_DIE_ATTACK_AUTO_UPH
+2025-07-03 15:16:32,837 - INFO - [app.py:379] - Cleaned up temporary directory: C:\Users\41800558\AppData\Local\Temp\tmpdj4enmxj
+2025-07-03 15:16:32,839 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:16:32] "POST / HTTP/1.1" 200 -
+2025-07-03 15:16:32,865 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:16:32] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+2025-07-03 15:16:32,866 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:16:32] "[36mGET /static/css/result.css HTTP/1.1[0m" 304 -
+2025-07-03 15:16:32,959 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:16:32] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
+2025-07-03 15:16:32,969 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:16:32] "[36mGET /static/js/result.js HTTP/1.1[0m" 304 -
+2025-07-03 15:16:48,510 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:16:48] "GET / HTTP/1.1" 200 -
+2025-07-03 15:16:48,551 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:16:48] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+2025-07-03 15:16:48,559 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:16:48] "[36mGET /static/css/index.css HTTP/1.1[0m" 304 -
+2025-07-03 15:16:48,560 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:16:48] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
+2025-07-03 15:16:48,560 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:16:48] "[36mGET /static/js/index.js HTTP/1.1[0m" 304 -
+2025-07-03 15:16:48,575 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:16:48] "GET /api/folders HTTP/1.1" 200 -
+2025-07-03 15:17:24,959 - INFO - [_internal.py:97] -  * Detected change in 'c:\\Users\\41800558\\Documents\\GitHub\\WebApp\\WebApp\\Webapp\\python-executor-app\\src\\functions\\PNP_AUTO_UPH.py', reloading
+2025-07-03 15:17:25,108 - INFO - [_internal.py:97] -  * Restarting with stat
+2025-07-03 15:17:25,796 - INFO - [app.py:907] -    Local:   http://127.0.0.1:80
+2025-07-03 15:17:25,796 - INFO - [app.py:908] -    Network: http://10.153.88.147:80
+2025-07-03 15:17:25,797 - INFO - [app.py:909] -    Debug:   True
+2025-07-03 15:17:25,797 - INFO - [app.py:910] -    Functions: ['DIE_ATTACK_AUTO_UPH', 'LOGVIEW', 'PNP_AUTO_UPH', 'PNP_CHANG_TYPE', 'WB_AUTO_UPH']
+2025-07-03 15:17:25,810 - WARNING - [_internal.py:97] -  * Debugger is active!
+2025-07-03 15:17:25,812 - INFO - [_internal.py:97] -  * Debugger PIN: 588-859-978
+2025-07-03 15:17:33,536 - INFO - [app.py:303] - Saved uploaded file: APL_utl1_2024Q2_PKG_PICK_PLACE.xlsx
+2025-07-03 15:17:33,537 - INFO - [app.py:260] - Executing function: PNP_AUTO_UPH
+2025-07-03 15:17:33,538 - INFO - [app.py:261] - Input directory: C:\Users\41800558\AppData\Local\Temp\tmpvp4agb9q
+2025-07-03 15:17:33,538 - INFO - [app.py:262] - Output directory: c:\Users\41800558\Documents\GitHub\WebApp\WebApp\Webapp\python-executor-app\src\output_PNP_AUTO_UPH
+2025-07-03 15:17:42,478 - INFO - [app.py:379] - Cleaned up temporary directory: C:\Users\41800558\AppData\Local\Temp\tmpvp4agb9q
+2025-07-03 15:17:42,479 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:17:42] "POST / HTTP/1.1" 200 -
+2025-07-03 15:17:42,499 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:17:42] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+2025-07-03 15:17:42,507 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:17:42] "[36mGET /static/css/result.css HTTP/1.1[0m" 304 -
+2025-07-03 15:17:42,509 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:17:42] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
+2025-07-03 15:17:42,511 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 15:17:42] "[36mGET /static/js/result.js HTTP/1.1[0m" 304 -
+2025-07-03 15:21:26,957 - INFO - [_internal.py:97] -  * Detected change in 'c:\\Users\\41800558\\Documents\\GitHub\\WebApp\\WebApp\\Webapp\\python-executor-app\\src\\functions\\DIE_ATTACK_AUTO_UPH.py', reloading
+2025-07-03 15:21:27,128 - INFO - [_internal.py:97] -  * Restarting with stat
+2025-07-03 15:21:27,802 - INFO - [app.py:907] -    Local:   http://127.0.0.1:80
+2025-07-03 15:21:27,802 - INFO - [app.py:908] -    Network: http://10.153.88.147:80
+2025-07-03 15:21:27,802 - INFO - [app.py:909] -    Debug:   True
+2025-07-03 15:21:27,803 - INFO - [app.py:910] -    Functions: ['DIE_ATTACK_AUTO_UPH', 'LOGVIEW', 'PNP_AUTO_UPH', 'PNP_CHANG_TYPE', 'WB_AUTO_UPH']
+2025-07-03 15:21:27,816 - WARNING - [_internal.py:97] -  * Debugger is active!
+2025-07-03 15:21:27,818 - INFO - [_internal.py:97] -  * Debugger PIN: 588-859-978

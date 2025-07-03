@@ -134,6 +134,8 @@ def process_die_attach_data(input_path, output_dir):
             raise Exception("ไม่พบคอลัมน์ UPH ในข้อมูล")
         
         uph_col = col_map['uph']
+
+        df['Unit per Hour'] = 1
         
         # จัดกลุ่มข้อมูล
         grouped = df.groupby(['bom_no', 'Machine_Model'])
@@ -176,6 +178,7 @@ def process_die_attach_data(input_path, output_dir):
                 print(f"✅ ข้อมูลหลังตัด outliers: {cleaned_count} แถว")
                 print(f"📊 UPH เฉลี่ยเดิม: {original_mean:.2f}")
                 print(f"📊 UPH เฉลี่ยใหม่: {cleaned_mean:.2f}")
+
                 
                 # เพิ่มผลลัพธ์ลงใน summary
                 summary_results.append({
@@ -183,7 +186,9 @@ def process_die_attach_data(input_path, output_dir):
                     'Machine_Model': machine_model,
                     'optn_code': optn_code,
                     'operation': operation,
-                    'Wire Per Hour': round(cleaned_mean, 2)
+                    'Wire Per Hour': round(cleaned_mean, 2),
+                    'Wire Per Unit': 1,
+                    'Unit Per Hour': round(cleaned_mean/1, 2)
                 })
                 
             except Exception as e:
