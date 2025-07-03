@@ -368,3 +368,68 @@
 2025-07-02 20:53:53,552 - INFO - [_internal.py:97] - 192.168.1.74 - - [02/Jul/2025 20:53:53] "[36mGET /static/js/index.js HTTP/1.1[0m" 304 -
 2025-07-02 20:53:53,564 - INFO - [_internal.py:97] - 192.168.1.74 - - [02/Jul/2025 20:53:53] "GET /static/css/index.css HTTP/1.1" 200 -
 2025-07-02 20:53:53,751 - INFO - [_internal.py:97] - 192.168.1.74 - - [02/Jul/2025 20:53:53] "GET /api/folders HTTP/1.1" 200 -
+2025-07-03 11:26:58,580 - INFO - [_internal.py:97] - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:80
+ * Running on http://10.153.88.147:80
+2025-07-03 11:26:58,580 - INFO - [_internal.py:97] - [33mPress CTRL+C to quit[0m
+2025-07-03 11:26:58,582 - INFO - [_internal.py:97] -  * Restarting with stat
+2025-07-03 11:26:59,292 - WARNING - [_internal.py:97] -  * Debugger is active!
+2025-07-03 11:26:59,295 - INFO - [_internal.py:97] -  * Debugger PIN: 588-859-978
+2025-07-03 11:27:04,576 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 11:27:04] "GET / HTTP/1.1" 200 -
+2025-07-03 11:27:04,720 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 11:27:04] "[36mGET /static/css/index.css HTTP/1.1[0m" 304 -
+2025-07-03 11:27:04,726 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 11:27:04] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+2025-07-03 11:27:04,750 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 11:27:04] "GET /static/js/index.js HTTP/1.1" 200 -
+2025-07-03 11:27:04,755 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 11:27:04] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
+2025-07-03 11:27:04,857 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 11:27:04] "GET /api/folders HTTP/1.1" 200 -
+2025-07-03 11:27:04,877 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 11:27:04] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2025-07-03 11:27:18,387 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 11:27:18] "GET /lookup_last_type HTTP/1.1" 200 -
+2025-07-03 11:27:18,407 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 11:27:18] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+2025-07-03 11:27:18,410 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 11:27:18] "GET /static/css/lookup_last_type.css HTTP/1.1" 200 -
+2025-07-03 11:27:18,410 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 11:27:18] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
+2025-07-03 11:27:23,706 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 11:27:23] "GET /api/folder-files?path=c:\\Users\\41800558\\Documents\\GitHub\\WebApp\\WebApp\\Webapp\\python-executor-app\\src\\data_logview HTTP/1.1" 200 -
+2025-07-03 11:27:25,361 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 11:27:25] "GET / HTTP/1.1" 200 -
+2025-07-03 11:27:25,379 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 11:27:25] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+2025-07-03 11:27:25,387 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 11:27:25] "[36mGET /static/css/index.css HTTP/1.1[0m" 304 -
+2025-07-03 11:27:25,388 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 11:27:25] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
+2025-07-03 11:27:25,389 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 11:27:25] "[36mGET /static/js/index.js HTTP/1.1[0m" 304 -
+2025-07-03 11:27:25,405 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 11:27:25] "GET /api/folders HTTP/1.1" 200 -
+2025-07-03 11:27:54,128 - INFO - [app.py:146] - Saved uploaded file: APL_utl1_2024Q1_DIE_ATTACH_MAP.xlsx
+2025-07-03 11:27:54,128 - INFO - [app.py:122] - Executing function: DIE_ATTACK_AUTO_UPH
+2025-07-03 11:27:54,129 - INFO - [app.py:123] - Input directory: C:\Users\41800558\AppData\Local\Temp\tmpfusvg_k1
+2025-07-03 11:27:54,129 - INFO - [app.py:124] - Output directory: c:\Users\41800558\Documents\GitHub\WebApp\WebApp\Webapp\python-executor-app\src\output_DIE_ATTACK_AUTO_UPH
+2025-07-03 11:28:11,137 - INFO - [app.py:188] - Cleaned up temporary directory: C:\Users\41800558\AppData\Local\Temp\tmpfusvg_k1
+2025-07-03 11:28:11,139 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 11:28:11] "POST / HTTP/1.1" 200 -
+2025-07-03 11:28:11,180 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 11:28:11] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
+2025-07-03 11:28:11,180 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 11:28:11] "[36mGET /static/css/result.css HTTP/1.1[0m" 304 -
+2025-07-03 11:28:11,181 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 11:28:11] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+2025-07-03 11:28:11,182 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 11:28:11] "[36mGET /static/js/result.js HTTP/1.1[0m" 304 -
+2025-07-03 11:29:28,390 - INFO - [app.py:146] - Saved uploaded file: APL_utl1_2024Q1_DIE_ATTACH_MAP.xlsx
+2025-07-03 11:29:28,391 - INFO - [app.py:122] - Executing function: DIE_ATTACK_AUTO_UPH
+2025-07-03 11:29:28,391 - INFO - [app.py:123] - Input directory: C:\Users\41800558\AppData\Local\Temp\tmp1jkweqgd
+2025-07-03 11:29:28,391 - INFO - [app.py:124] - Output directory: c:\Users\41800558\Documents\GitHub\WebApp\WebApp\Webapp\python-executor-app\src\output_DIE_ATTACK_AUTO_UPH
+2025-07-03 11:29:44,973 - INFO - [app.py:188] - Cleaned up temporary directory: C:\Users\41800558\AppData\Local\Temp\tmp1jkweqgd
+2025-07-03 11:29:44,975 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 11:29:44] "POST / HTTP/1.1" 200 -
+2025-07-03 11:29:45,008 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 11:29:45] "GET /static/css/style.css HTTP/1.1" 200 -
+2025-07-03 11:29:45,009 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 11:29:45] "GET /static/css/result.css HTTP/1.1" 200 -
+2025-07-03 11:29:45,012 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 11:29:45] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
+2025-07-03 11:29:45,012 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 11:29:45] "[36mGET /static/js/result.js HTTP/1.1[0m" 304 -
+2025-07-03 11:30:39,162 - INFO - [app.py:146] - Saved uploaded file: APL_utl1_2024Q1_DIE_ATTACH_MAP.xlsx
+2025-07-03 11:30:39,163 - INFO - [app.py:122] - Executing function: DIE_ATTACK_AUTO_UPH
+2025-07-03 11:30:39,163 - INFO - [app.py:123] - Input directory: C:\Users\41800558\AppData\Local\Temp\tmps51fhcvt
+2025-07-03 11:30:39,163 - INFO - [app.py:124] - Output directory: c:\Users\41800558\Documents\GitHub\WebApp\WebApp\Webapp\python-executor-app\src\output_DIE_ATTACK_AUTO_UPH
+2025-07-03 11:30:49,320 - INFO - [app.py:188] - Cleaned up temporary directory: C:\Users\41800558\AppData\Local\Temp\tmps51fhcvt
+2025-07-03 11:30:49,322 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 11:30:49] "POST / HTTP/1.1" 200 -
+2025-07-03 11:30:49,353 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 11:30:49] "GET /static/css/style.css HTTP/1.1" 200 -
+2025-07-03 11:30:49,361 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 11:30:49] "GET /static/css/result.css HTTP/1.1" 200 -
+2025-07-03 11:30:49,362 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 11:30:49] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
+2025-07-03 11:30:49,363 - INFO - [_internal.py:97] - 10.153.88.147 - - [03/Jul/2025 11:30:49] "[36mGET /static/js/result.js HTTP/1.1[0m" 304 -
+2025-07-03 11:43:59,613 - INFO - [_internal.py:97] -  * Detected change in 'c:\\Users\\41800558\\Documents\\GitHub\\WebApp\\WebApp\\Webapp\\python-executor-app\\src\\app.py', reloading
+2025-07-03 11:43:59,752 - INFO - [_internal.py:97] -  * Restarting with stat
+2025-07-03 11:44:01,424 - WARNING - [_internal.py:97] -  * Debugger is active!
+2025-07-03 11:44:01,426 - INFO - [_internal.py:97] -  * Debugger PIN: 588-859-978
+2025-07-03 11:44:01,663 - INFO - [_internal.py:97] -  * Detected change in 'c:\\Users\\41800558\\Documents\\GitHub\\WebApp\\WebApp\\Webapp\\python-executor-app\\src\\app.py', reloading
+2025-07-03 11:44:01,765 - INFO - [_internal.py:97] -  * Restarting with stat
+2025-07-03 11:44:02,453 - WARNING - [_internal.py:97] -  * Debugger is active!
+2025-07-03 11:44:02,455 - INFO - [_internal.py:97] -  * Debugger PIN: 588-859-978
+2025-07-03 11:45:54,337 - INFO - [_internal.py:97] -  * Detected change in 'c:\\Users\\41800558\\Documents\\GitHub\\WebApp\\WebApp\\Webapp\\python-executor-app\\src\\app.py', reloading

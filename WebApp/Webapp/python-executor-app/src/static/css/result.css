@@ -483,25 +483,11 @@ body {
 .result-table td:first-child {
     position: sticky;
     left: 0;
-    background: linear-gradient(135deg, #667eea, #764ba2);
-    color: #fff;
+    background: #fff !important;   /* สีขาวตลอดแนว */
+    color: #2d3a4b;
     font-weight: 600;
     z-index: 25;
-    border-right: 2px solid #5a67d8;
-}
-
-.result-table td:first-child {
-    background: #f8f9fa;
-    color: #2d3a4b;
-    font-weight: 500;
-}
-
-.result-table tr:nth-child(even) td:first-child {
-    background: #e9ecef;
-}
-
-.result-table tr:hover td:first-child {
-    background: #e3f2fd;
+    border-right: 2px solid (135deg, #007bff 0%, #0056b3 100%);
 }
 
 /* DataTables Custom Styling */
@@ -968,12 +954,12 @@ body {
 }
 
 #tableArea::-webkit-scrollbar-thumb {
-    background: linear-gradient(135deg, #667eea, #764ba2);
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
     border-radius: 10px;
 }
 
 #tableArea::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(135deg, #5a67d8, #6c5ce7);
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
 }
 
 /* Animation for table show/hide */
