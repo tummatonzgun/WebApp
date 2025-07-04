@@ -11,6 +11,7 @@ from typing import Tuple, List, Optional, Dict, Any
 from dataclasses import dataclass
 from enum import Enum
 
+
 # Import custom modules
 from functions.PNP_CHANG_TYPE import lookup_last_type
 
@@ -46,20 +47,6 @@ class FileType(Enum):
     CSV = ".csv"
     TEXT = ".txt"
 
-# ===== LOGGING SETUP =====
-def setup_logging() -> logging.Logger:
-    """Configure application logging"""
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s',
-        handlers=[
-            logging.StreamHandler(),
-            logging.FileHandler('app.log')
-        ]
-    )
-    return logging.getLogger(__name__)
-
-logger = setup_logging()
 
 # ===== FLASK APP INITIALIZATION =====
 def create_app(config: Config = None) -> Flask:
@@ -139,7 +126,7 @@ class FileReader:
                 return None, "รูปแบบไฟล์ไม่ถูกต้อง"
                 
         except Exception as e:
-            logger.error(f"Error reading file {file_path}: {e}")
+            
             return None, f"เกิดข้อผิดพลาดในการอ่านไฟล์: {str(e)}"
     
     @staticmethod
@@ -840,13 +827,7 @@ class ErrorHandler:
     
     @staticmethod
     def handle_lookup_error(error_msg):
-        """
-        จัดการ error สำหรับ lookup operations โดยแปลงเป็นข้อความที่ user เข้าใจง่าย
-        Args:
-            error_msg: ข้อความ error ดั้งเดิม
-        Returns:
-            str: ข้อความ error ที่เข้าใจง่าย
-        """
+
         if "ไม่พบไฟล์ Last_Type.xlsx" in error_msg:
             return "ไม่พบไฟล์ Last_Type.xlsx กรุณาวางไฟล์ในโฟลเดอร์ Upload หรือ output_PNP_CHANG_TYPE"
         elif "ไม่มีคอลัมน์ bom_no" in error_msg:
@@ -892,6 +873,21 @@ class AppConstants:
     # ชื่อโฟลเดอร์ output
     OUTPUT_DIR_LOOKUP = "output_lookup_last_type"
     OUTPUT_DIR_PNP = "output_PNP_CHANG_TYPE"
+
+# ===== LOGGING CONFIGURATION =====
+def setup_logging() -> logging.Logger:
+    """Configure application logging (console only, no file)"""
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s',
+        handlers=[
+            logging.StreamHandler()  # log เฉพาะที่ console
+            # ไม่มี FileHandler('app.log')
+        ]
+    )
+    return logging.getLogger("webapp")
+
+logger = setup_logging()
 
 if __name__ == "__main__":
     # ===== การเตรียมโฟลเดอร์และเริ่มต้น Application =====
