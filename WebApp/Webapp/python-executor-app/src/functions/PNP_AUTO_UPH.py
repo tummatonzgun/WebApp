@@ -1,19 +1,9 @@
 import pandas as pd
-import os
-import glob
-import numpy as np
-from pathlib import Path
-import time
-from datetime import datetime  
+import numpy as np  
 
-def validate_input_file(input_path):
-    """ตรวจสอบไฟล์ input"""
-    if not os.path.exists(input_path):
-        raise FileNotFoundError(f"ไม่พบไฟล์ {input_path}")
-    return input_path
+df = pd.read_excel("data/APL_utl1_2024Q1_DIE_ATTACH_MAP.xlsx")
 
 def apply_zscore(df):
-    """ใช้วิธี Z-Score ในการตัด outliers"""
     col_map = {col.lower(): col for col in df.columns}
     if 'uph' not in col_map:
         raise KeyError("ไม่พบคอลัมน์ UPH ในข้อมูล")
@@ -29,7 +19,6 @@ def apply_zscore(df):
     return filtered
 
 def has_outlier(df):
-    """ตรวจสอบว่ามี outliers หรือไม่ด้วยวิธี IQR"""
     col_map = {col.lower(): col for col in df.columns}
     if 'uph' not in col_map:
         raise KeyError("ไม่พบคอลัมน์ UPH ในข้อมูล")
@@ -43,7 +32,7 @@ def has_outlier(df):
     return ((df[uph_col] < lower) | (df[uph_col] > upper)).sum() > 0
 
 def apply_iqr(df):
-    """ใช้วิธี IQR ในการตัด outliers"""
+    """Apply IQR Method one time."""
     col_map = {col.lower(): col for col in df.columns}
     if 'uph' not in col_map:
         raise KeyError("ไม่พบคอลัมน์ UPH ในข้อมูล")
@@ -59,7 +48,6 @@ def apply_iqr(df):
     return filtered
 
 def remove_outliers_auto(df_model, max_iter=20):
-    """ตัด outliers อัตโนมัติด้วยการวนลูป Z-Score และ IQR"""
     col_map = {col.lower(): col for col in df_model.columns}
     if 'uph' not in col_map:
         raise KeyError("ไม่พบคอลัมน์ UPH ในข้อมูล")
@@ -91,238 +79,222 @@ def remove_outliers_auto(df_model, max_iter=20):
     current_df['Outlier_Method'] = f'IQR-Z-Score Loop ×{max_iter}+'
     return current_df
 
-def process_die_attach_data(input_path, output_dir):
-    """ฟังก์ชันหลักสำหรับประมวลผลข้อมูล Die Attach"""
-    try:
-        print(f"🔍 เริ่มประมวลผล: {input_path}")
-        print(f"📁 Output directory: {output_dir}")
-        
-        # ตรวจสอบไฟล์ input
-        validate_input_file(input_path)
-        
-        # สร้าง output directory ถ้าไม่มี
-        os.makedirs(output_dir, exist_ok=True)
-        print(f"✅ สร้าง output directory: {output_dir}")
-        
-        print("📊 กำลังโหลดข้อมูล...")
-        # อ่านข้อมูล
-        try:
-            df = pd.read_excel(input_path)
-        except Exception as e:
-            # ลองอ่านเป็น CSV ถ้าอ่าน Excel ไม่ได้
-            try:
-                df = pd.read_csv(input_path)
-                print("ℹ️ อ่านไฟล์เป็นรูปแบบ CSV")
-            except:
-                raise Exception(f"ไม่สามารถอ่านไฟล์ได้: {str(e)}")
-        
-        if df.empty:
-            raise Exception("ไฟล์ข้อมูลว่างเปล่า")
-        
-        print(f"📈 ขนาดข้อมูลเริ่มต้น: {len(df)} แถว")
-        print(f"📋 คอลัมน์ในข้อมูล: {list(df.columns)}")
-        
-        # ตรวจสอบคอลัมน์ที่จำเป็น
-        required_columns = ['bom_no', 'Machine_Model', 'optn_code','operation']
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            raise Exception(f"ไม่พบคอลัมน์ที่จำเป็น: {missing_columns}")
-        
-        # ตรวจสอบคอลัมน์ UPH
-        col_map = {col.lower(): col for col in df.columns}
-        if 'uph' not in col_map:
-            raise Exception("ไม่พบคอลัมน์ UPH ในข้อมูล")
-        
-        uph_col = col_map['uph']
-
-        df['Unit per Hour'] = 1
-        
-        # จัดกลุ่มข้อมูล
-        grouped = df.groupby(['bom_no', 'Machine_Model'])
-        
-        # แสดงข้อมูล group
-        print(f"\n🔢 จำนวน groups: {grouped.ngroups}")
-        print("\n📊 ขนาดของแต่ละ group:")
-        group_sizes = grouped.size()
-        print(group_sizes)
-        
-        if grouped.ngroups == 0:
-            raise Exception("ไม่พบข้อมูลสำหรับจัดกลุ่ม")
-        
-        # ประมวลผลแต่ละ group และสร้างสรุปผลลัพธ์
-        print("\n🔧 === เริ่มการตัด outliers ===")
-        summary_results = []
-        
-        for name, group in grouped:
-            bom_no, machine_model = name
-            print(f"\n⚙️ กำลังประมวลผล BOM: {bom_no}, Machine: {machine_model}")
-            print(f"📊 ข้อมูลในกลุ่มนี้: {len(group)} แถว")
-            
-            # ดึงค่าจากแถวแรกของกลุ่ม
-            optn_code = group['optn_code'].iloc[0] if 'optn_code' in group.columns else ''
-            operation = group['operation'].iloc[0] if 'operation' in group.columns else ''
-            
-            original_count = len(group)
-            original_mean = group[uph_col].mean()
-            
-            try:
-                # ตัด outliers สำหรับกลุ่มนี้
-                cleaned_group = remove_outliers_auto(group.copy())
-                
-                # คำนวณสถิติหลังตัด outliers
-                cleaned_count = len(cleaned_group)
-                cleaned_mean = cleaned_group[uph_col].mean()
-                removed_count = original_count - cleaned_count
-                outlier_method = cleaned_group['Outlier_Method'].iloc[0] if len(cleaned_group) > 0 else 'Error'
-                
-                print(f"✅ ข้อมูลหลังตัด outliers: {cleaned_count} แถว")
-                print(f"📊 UPH เฉลี่ยเดิม: {original_mean:.2f}")
-                print(f"📊 UPH เฉลี่ยใหม่: {cleaned_mean:.2f}")
-
-                
-                # เพิ่มผลลัพธ์ลงใน summary
-                summary_results.append({
-                    'bom_no': bom_no,
-                    'Machine_Model': machine_model,
-                    'optn_code': optn_code,
-                    'operation': operation,
-                    'Wire Per Hour': round(cleaned_mean, 2),
-                    'Wire Per Unit': 1,
-                    'Unit Per Hour': round(cleaned_mean/1, 2)
-                })
-                
-            except Exception as e:
-                print(f"⚠️ เกิดข้อผิดพลาดกับกลุ่ม {name}: {str(e)}")
-                
-                # เพิ่มผลลัพธ์ที่เกิดข้อผิดพลาด
-                summary_results.append({
-                    'bom_no': bom_no,
-                    'Machine_Model': machine_model,
-                    'optn_code': optn_code,
-                    'operation': operation,
-                    'Wire Per Hour': round(original_mean, 2)
-                })
-        
-        # สร้าง DataFrame สรุปผลลัพธ์
-        if summary_results:
-            summary_df = pd.DataFrame(summary_results)
-            
-            print(f"\n📋 === สรุปผลลัพธ์ ===")
-            print(f"✅ จำนวนกลุ่มที่ประมวลผล: {len(summary_df)} กลุ่ม")
-            print(f"📊 Wire Per Hour เฉลี่ยรวม: {summary_df['Wire Per Hour'].mean():.2f}")
-            
-            # แสดง top 5 Wire Per Hour สูงสุด
-            print("\n📈 === Top 5 Wire Per Hour สูงสุดหลังตัด Outliers ===")
-            top_uph = summary_df.nlargest(5, 'Wire Per Hour')[['bom_no', 'Machine_Model', 'optn_code', 'operation', 'Wire Per Hour']]
-            print(top_uph)
-            
-            # สร้างชื่อไฟล์ output พร้อม timestamp
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            output_filename = f"die_attach_uph_summary_{timestamp}.xlsx"
-            output_file = os.path.join(output_dir, output_filename)
-            
-            # บันทึกผลลัพธ์
-            print(f"\n💾 กำลังบันทึกไฟล์: {output_file}")
-            try:
-                summary_df.to_excel(output_file, index=False, engine='openpyxl')
-                
-                # ตรวจสอบว่าไฟล์ถูกสร้างแล้ว
-                if os.path.exists(output_file):
-                    file_size = os.path.getsize(output_file)
-                    print(f"✅ บันทึกไฟล์สำเร็จ! ขนาด: {file_size} bytes")
-                    print(f"📁 ไฟล์ผลลัพธ์: {output_file}")
-                else:
-                    raise Exception("ไฟล์ไม่ถูกสร้าง")
-                    
-            except Exception as e:
-                # ถ้าบันทึก Excel ไม่ได้ ลองบันทึกเป็น CSV
-                output_filename = f"die_attach_uph_summary_{timestamp}.csv"
-                output_file = os.path.join(output_dir, output_filename)
-                print(f"⚠️ ไม่สามารถบันทึก Excel ได้ กำลังบันทึกเป็น CSV: {output_file}")
-                
-                summary_df.to_csv(output_file, index=False, encoding='utf-8-sig')
-                
-                if os.path.exists(output_file):
-                    file_size = os.path.getsize(output_file)
-                    print(f"✅ บันทึกไฟล์ CSV สำเร็จ! ขนาด: {file_size} bytes")
-                else:
-                    raise Exception(f"ไม่สามารถบันทึกไฟล์ได้: {str(e)}")
-            
-            return {
-                "success": True,
-                "message": f"ประมวลผลสำเร็จ ได้ไฟล์สรุป: {os.path.basename(output_file)}",
-                "output_file": output_file,
-                "total_groups": len(summary_df),
-                "avg_uph": round(summary_df['Wire Per Hour'].mean(), 2),
-                "file_size": os.path.getsize(output_file) if os.path.exists(output_file) else 0
-            }
-            
-        else:
-            return {
-                "success": False,
-                "message": "ไม่สามารถประมวลผลข้อมูลได้",
-                "error": "No processed groups available"
-            }
-            
-    except Exception as e:
-        print(f"❌ เกิดข้อผิดพลาด: {str(e)}")
-        return {
-            "success": False,
-            "message": f"เกิดข้อผิดพลาด: {str(e)}",
-            "error": str(e)
-        }
-
-def run(input_dir, output_dir):
-    """ฟังก์ชันสำหรับเรียกใช้จาก app.py"""
-    print(f"🚀 เริ่มต้นการประมวลผล...")
-    print(f"📁 Input directory: {input_dir}")
-    print(f"📁 Output directory: {output_dir}")
+def remove_outliers(df):
+    col_map = {col.lower(): col for col in df.columns}
     
-    try:
-        # หาไฟล์ Excel/CSV ใน input directory
-        excel_files = []
-        csv_files = []
+    # หาคอลัมน์ Machine Model
+    model_col = None
+    if 'machine model' in col_map:
+        model_col = col_map['machine model']
+    elif 'machine_model' in col_map:
+        model_col = col_map['machine_model']
+    else:
+        raise KeyError("ไม่พบคอลัมน์ Machine Model หรือ Machine_Model ในข้อมูล")
+    
+    # หาคอลัมน์ bom_no
+    bom_col = None
+    if 'bom_no' in col_map:
+        bom_col = col_map['bom_no']
+    elif 'bom no' in col_map:
+        bom_col = col_map['bom no']
+    else:
+        raise KeyError("ไม่พบคอลัมน์ bom_no ในข้อมูล")
+    
+    # รวมข้อมูลที่ผ่านการตัด outliers ตามกลุ่ม bom_no และ Machine Model
+    result_dfs = []
+    
+    # จัดกลุ่มตาม bom_no และ Machine Model
+    for (bom_no, machine_model), group_df in df.groupby([bom_col, model_col]):
+        print(f"ประมวลผลกลุ่ม: BOM={bom_no}, Machine={machine_model}, จำนวนข้อมูล={len(group_df)}")
         
-        # ค้นหาไฟล์ Excel
-        for ext in ['*.xlsx', '*.xls']:
-            excel_files.extend(glob.glob(os.path.join(input_dir, ext)))
-        
-        # ค้นหาไฟล์ CSV
-        csv_files.extend(glob.glob(os.path.join(input_dir, '*.csv')))
-        
-        all_files = excel_files + csv_files
-        
-        print(f"🔍 พบไฟล์: {len(all_files)} ไฟล์")
-        for file in all_files:
-            print(f"  - {os.path.basename(file)}")
-        
-        if not all_files:
-            return {
-                "success": False,
-                "message": "ไม่พบไฟล์ Excel หรือ CSV ใน input directory",
-                "error": "No input files found"
-            }
-        
-        # ประมวลผลไฟล์แรกที่พบ
-        input_file = all_files[0]
-        print(f"📊 กำลังประมวลผลไฟล์: {os.path.basename(input_file)}")
-        
-        result = process_die_attach_data(input_file, output_dir)
-        
-        if result["success"]:
-            print(f"✅ ประมวลผลเสร็จสิ้น: {result['message']}")
-        else:
-            print(f"❌ ประมวลผลล้มเหลว: {result['message']}")
-        
-        return result
-        
-    except Exception as e:
-        error_msg = f"เกิดข้อผิดพลาดในฟังก์ชัน run: {str(e)}"
-        print(f"❌ {error_msg}")
-        return {
-            "success": False,
-            "message": error_msg,
-            "error": str(e)
-        }
+        # ตัด outliers สำหรับแต่ละกลุ่ม
+        cleaned_group = remove_outliers_auto(group_df)
+        result_dfs.append(cleaned_group)
+    
+    # รวมผลลัพธ์ทั้งหมด
+    return pd.concat(result_dfs, ignore_index=True)
 
+def time_series_analysis(df):
+    col_map = {col.lower(): col for col in df.columns}
+    
+    # หาคอลัมน์วันที่ที่เป็นไปได้
+    date_cols = []
+    for col_name in df.columns:
+        if any(keyword in col_name.lower() for keyword in ['date', 'time', 'วัน', 'เวลา']):
+            date_cols.append(col_name)
+    
+    if not date_cols:
+        print("ไม่พบคอลัมน์วันที่ในข้อมูล")
+        return df
+    
+    # ใช้คอลัมน์วันที่แรกที่พบ
+    date_col = date_cols[0]
+    print(f"ใช้คอลัมน์วันที่: {date_col}")
+    
+    # แปลงเป็น datetime และจัดรูปแบบ
+    df['date_time_start'] = pd.to_datetime(df[date_col], errors='coerce')
+    
+    # จัดรูปแบบเป็น YYYY/MM/DD
+    df['date_time_start'] = df['date_time_start'].dt.strftime('%Y/%m/%d')
+    
+    # กรองข้อมูลที่แปลงไม่ได้
+    invalid_dates = df['date_time_start'].isna().sum()
+    if invalid_dates > 0:
+        print(f"พบวันที่ที่แปลงไม่ได้: {invalid_dates} แถว")
+        df = df.dropna(subset=['date_time_start'])
+    
+    print(f"แปลงวันที่เสร็จสิ้น รูปแบบ: {df['date_time_start'].iloc[0] if len(df) > 0 else 'ไม่มีข้อมูล'}")
+    
+    return df
 
+def find_max_or_min_date(df):
+    if 'date_time_start' not in df.columns:
+        raise KeyError("ไม่พบคอลัมน์ date_time_start ในข้อมูล")
+
+    max_date = df['date_time_start'].max()
+    min_date = df['date_time_start'].min()
+    return max_date, min_date
+
+def select_date_range(df):
+    """ให้ผู้ใช้เลือกช่วงวันที่ก่อนประมวลผล"""
+    print("=== การเลือกช่วงวันที่สำหรับประมวลผล ===")
+    
+    # แสดงข้อมูลช่วงวันที่ที่มีในข้อมูล
+    max_date, min_date = find_max_or_min_date(df)
+    print(f"ช่วงวันที่ที่มีข้อมูล: {min_date} ถึง {max_date}")
+    
+    # แสดงตัวอย่างวันที่ที่มีในข้อมูล
+    print("\nตัวอย่างวันที่ที่มีในข้อมูล:")
+    sample_dates = df['date_time_start'].unique()[:5]
+    for date in sample_dates:
+        print(f"  - {date}")
+    
+    print("\nกรอกวันที่ในรูปแบบ YYYY/MM/DD (เช่น 2024/01/15)")
+    print("(กดเว้นวรรคเพื่อใช้ค่าเริ่มต้น)")
+    
+    # รับ input วันที่เริ่มต้น
+    while True:
+        start_date = input(f"กรุณาใส่วันที่เริ่มต้น (เริ่มต้น: {min_date}): ").strip()
+        if start_date == "":
+            start_date = min_date
+            print(f"ใช้วันที่เริ่มต้น: {start_date}")
+            break
+        # ตรวจสอบรูปแบบวันที่
+        try:
+            pd.to_datetime(start_date, format='%Y/%m/%d')
+            break
+        except:
+            print("รูปแบบวันที่ไม่ถูกต้อง กรุณาใส่ในรูปแบบ YYYY/MM/DD")
+    
+    # รับ input วันที่สิ้นสุด
+    while True:
+        end_date = input(f"กรุณาใส่วันที่สิ้นสุด (เริ่มต้น: {max_date}): ").strip()
+        if end_date == "":
+            end_date = max_date
+            print(f"ใช้วันที่สิ้นสุด: {end_date}")
+            break
+        # ตรวจสอบรูปแบบวันที่
+        try:
+            pd.to_datetime(end_date, format='%Y/%m/%d')
+            break
+        except:
+            print("รูปแบบวันที่ไม่ถูกต้อง กรุณาใส่ในรูปแบบ YYYY/MM/DD")
+    
+    return start_date, end_date
+
+def filter_data_by_date(df, start_date, end_date):
+    """กรองข้อมูลตามช่วงวันที่ที่เลือก"""
+    print(f"\n=== กรองข้อมูลตามช่วงวันที่ {start_date} ถึง {end_date} ===")
+    
+    # กรองข้อมูลตามช่วงวันที่
+    filtered_df = df[df['date_time_start'].between(start_date, end_date)].copy()
+    
+    if len(filtered_df) == 0:
+        print("ไม่พบข้อมูลในช่วงวันที่ที่เลือก")
+        return None
+    
+    print(f"พบข้อมูล {len(filtered_df)} แถว ในช่วงวันที่ที่เลือก")
+    print(f"ข้อมูลเดิม: {len(df)} แถว")
+    print(f"ข้อมูลที่กรอง: {len(filtered_df)} แถว ({len(filtered_df)/len(df)*100:.1f}%)")
+    
+    return filtered_df
+
+def calculate_group_average(df, start_date, end_date):
+    """คำนวณค่าเฉลี่ยตามกลุ่ม"""
+    col_map = {col.lower(): col for col in df.columns}
+    
+    # หาคอลัมน์ Machine Model
+    model_col = None
+    if 'machine model' in col_map:
+        model_col = col_map['machine model']
+    elif 'machine_model' in col_map:
+        model_col = col_map['machine_model']
+    else:
+        raise KeyError("ไม่พบคอลัมน์ Machine Model หรือ Machine_Model ในข้อมูล")
+    
+    # หาคอลัมน์ bom_no
+    bom_col = None
+    if 'bom_no' in col_map:
+        bom_col = col_map['bom_no']
+    elif 'bom no' in col_map:
+        bom_col = col_map['bom no']
+    else:
+        raise KeyError("ไม่พบคอลัมน์ bom_no ในข้อมูล")
+    
+    # หาคอลัมน์ UPH
+    uph_col = None
+    if 'uph' in col_map:
+        uph_col = col_map['uph']
+    else:
+        raise KeyError("ไม่พบคอลัมน์ UPH ในข้อมูล")
+    
+    # คำนวณค่าเฉลี่ยตามกลุ่ม
+    grouped_average = df.groupby([bom_col, model_col])[uph_col].mean().reset_index()
+    
+    # แสดงผลลัพธ์
+    print(f"\n=== ค่าเฉลี่ย UPH ตามกลุ่ม (ช่วงวันที่ {start_date} ถึง {end_date}) ===")
+    print(grouped_average)
+    
+    # บันทึกไฟล์
+    date_range = f"{start_date.replace('/', '')}_to_{end_date.replace('/', '')}"
+    output_file = f"data/filtered_average_{date_range}.xlsx"
+    
+    grouped_average.to_excel(output_file, index=False)
+    print(f"\nบันทึกค่าเฉลี่ยตามช่วงวันที่ไปที่: {output_file}")
+    
+    return grouped_average
+
+# ===== MAIN EXECUTION =====
+
+print("=== เริ่มต้นการประมวลผลข้อมูล ===")
+print(f"ข้อมูลเริ่มต้น: {len(df)} แถว")
+
+# ขั้นตอนที่ 1: แปลงข้อมูลวันที่
+print("\n1. แปลงข้อมูลวันที่...")
+df = time_series_analysis(df)
+
+# ขั้นตอนที่ 2: เลือกช่วงวันที่
+print("\n2. เลือกช่วงวันที่...")
+start_date, end_date = select_date_range(df)
+
+# ขั้นตอนที่ 3: กรองข้อมูลตามวันที่
+print("\n3. กรองข้อมูลตามวันที่...")
+df_filtered = filter_data_by_date(df, start_date, end_date)
+
+if df_filtered is None:
+    print("ไม่สามารถดำเนินการต่อได้ เนื่องจากไม่มีข้อมูลในช่วงวันที่ที่เลือก")
+else:
+    # ขั้นตอนที่ 4: ตัด outliers
+    print("\n4. ตัด outliers...")
+    df_cleaned = remove_outliers(df_filtered)
+    df_cleaned = df_cleaned.reset_index(drop=True)
+    
+    print(f"ข้อมูลหลังตัด outliers: {len(df_cleaned)} แถว")
+    
+    # ขั้นตอนที่ 5: คำนวณค่าเฉลี่ยตามกลุ่ม
+    print("\n5. คำนวณค่าเฉลี่ยตามกลุ่ม...")
+    grouped_average = calculate_group_average(df_cleaned, start_date, end_date)
+    
+    print("\n=== การประมวลผลเสร็จสิ้น ===")
+    print(f"ข้อมูลสุดท้าย: {len(df_cleaned)} แถว")
+    print(f"จำนวนกลุ่ม: {len(grouped_average)} กลุ่ม")

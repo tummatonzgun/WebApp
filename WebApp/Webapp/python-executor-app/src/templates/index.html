@@ -84,6 +84,83 @@
                 </select>
             </div>
 
+            <!-- Function Details -->
+            <div id="functionDetails" class="form-group" style="display: none;">
+                <div class="function-info">
+                    <h4><i class="fas fa-info-circle"></i> รายละเอียดฟังก์ชัน</h4>
+                    <div class="info-card">
+                        <div class="info-section">
+                            <label><i class="fas fa-file-alt"></i> คำอธิบาย:</label>
+                            <p id="functionDescription">-</p>
+                        </div>
+                        <div class="info-section">
+                            <label><i class="fas fa-file-upload"></i> ไฟล์ที่รองรับ:</label>
+                            <p id="acceptedFiles">-</p>
+                        </div>
+                        <div class="info-section">
+                            <label><i class="fas fa-lightbulb"></i> ตัวอย่าง:</label>
+                            <p id="fileExample">-</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Date Range Preview -->
+            <div id="datePreviewSection" class="form-group" style="display: none;">
+                <div class="date-preview-info">
+                    <h4><i class="fas fa-calendar-alt"></i> ข้อมูลวันที่ในไฟล์</h4>
+                    <div class="preview-card">
+                        <div class="preview-section">
+                            <label><i class="fas fa-play"></i> วันที่เริ่มต้น:</label>
+                            <p id="fileStartDate">-</p>
+                        </div>
+                        <div class="preview-section">
+                            <label><i class="fas fa-stop"></i> วันที่สิ้นสุด:</label>
+                            <p id="fileEndDate">-</p>
+                        </div>
+                        <div class="preview-section">
+                            <label><i class="fas fa-calendar-days"></i> จำนวนวัน:</label>
+                            <p id="fileTotalDays">-</p>
+                        </div>
+                        <div class="preview-section">
+                            <label><i class="fas fa-database"></i> จำนวนข้อมูล:</label>
+                            <p id="fileRecordCount">-</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Date Range Selection -->
+            <div id="dateRangeSection" class="form-group" style="display: none;">
+                <label class="form-label">
+                    <i class="fas fa-calendar-alt"></i> ช่วงวันที่สำหรับการประมวลผล:
+                </label>
+                <div class="date-range-container">
+                    <div class="date-input-group">
+                        <label for="startDate">วันที่เริ่มต้น:</label>
+                        <input type="date" id="startDate" name="start_date" class="form-control date-input">
+                    </div>
+                    <div class="date-separator">
+                        <i class="fas fa-arrow-right"></i>
+                    </div>
+                    <div class="date-input-group">
+                        <label for="endDate">วันที่สิ้นสุด:</label>
+                        <input type="date" id="endDate" name="end_date" class="form-control date-input">
+                    </div>
+                </div>
+                <div class="date-options">
+                    <div class="option-item">
+                        <input type="checkbox" id="useAllDates" name="use_all_dates" checked>
+                        <label for="useAllDates">
+                            <i class="fas fa-check-square"></i> ใช้ข้อมูลทั้งหมด (ไม่จำกัดช่วงวันที่)
+                        </label>
+                    </div>
+                </div>
+                <div class="date-info">
+                    <p><i class="fas fa-info-circle"></i> หากเลือก "ใช้ข้อมูลทั้งหมด" ระบบจะใช้ข้อมูลทั้งหมดที่มีในไฟล์</p>
+                </div>
+            </div>
+
             <!-- File Input Selection -->
             <div class="form-group">
                 <label class="form-label">

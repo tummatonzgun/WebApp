@@ -19,12 +19,15 @@ class IndexPage {
     initializeElements() {
         return {
             // Core elements
-            fileInput: document.getElementById('fileInput') || document.querySelector('input[type="file"]'),
+            fileInput: document.getElementById('fileInput'),
             funcSelect: document.getElementById('funcSelect') || document.querySelector('select[name="func_name"]'),
-            mainForm: document.getElementById('mainForm') || document.querySelector('form'),
-            lookupLastTypeLink: document.getElementById('lookupLastTypeLink'),
-            loading: document.getElementById('loading'),
-            showTableCheckbox: document.getElementById('showTable'),
+            mainForm: document.getElementById('mainForm'),
+            
+            // Date range elements
+            dateRangeSection: document.getElementById('dateRangeSection'),
+            startDate: document.getElementById('startDate'),
+            endDate: document.getElementById('endDate'),
+            useAllDates: document.getElementById('useAllDates'),
             
             // Folder functionality elements
             uploadMethodRadio: document.getElementById('uploadMethod'),
@@ -307,6 +310,7 @@ class IndexPage {
 
         this.toggleLookupLink(selectedFunction);
         this.updateSupportedExtensions();
+        this.updateFunctionDetails();
         this.saveFormState();
 
         if (selectedFunction) {
@@ -322,11 +326,16 @@ class IndexPage {
             const validation = this.validateFiles(files);
             if (validation.isValid) {
                 this.showMessage(`เลือกไฟล์แล้ว: ${files.length} ไฟล์`, 'success');
+                
+                // Preview date range for supported functions
+                this.previewDateRangeIfNeeded(files[0]);
             } else {
                 this.showMessage(validation.message, 'error');
+                this.hideDatePreview();
             }
         } else {
             this.showMessage('ยกเลิกการเลือกไฟล์', 'info');
+            this.hideDatePreview();
         }
         
         this.saveFormState();
@@ -346,6 +355,12 @@ class IndexPage {
             if (this.state.selectedFiles.size === 0) {
                 event.preventDefault();
                 this.showMessage('กรุณาเลือกไฟล์อย่างน้อย 1 ไฟล์', 'error');
+                return;
+            }
+
+            // Check date range validation for folder method
+            if (!this.validateDateRange()) {
+                event.preventDefault();
                 return;
             }
 
@@ -371,6 +386,12 @@ class IndexPage {
         if (!validation.isValid) {
             event.preventDefault();
             this.showMessage(validation.message, 'error');
+            return;
+        }
+
+        // Check date range validation for upload method
+        if (!this.validateDateRange()) {
+            event.preventDefault();
             return;
         }
 
@@ -715,6 +736,112 @@ class IndexPage {
         }
     }
 
+    updateFunctionDetails() {
+        const selectedOperation = document.getElementById('selectedOperation')?.value || '';
+        const selectedFunction = this.elements.funcSelect?.value || '';
+        const functionDetailsDiv = document.getElementById('functionDetails');
+        
+        if (!functionDetailsDiv) {
+            console.log('Function details div not found');
+            return;
+        }
+
+        if (selectedOperation && selectedFunction && 
+            this.fileGuidanceData[selectedOperation] && 
+            this.fileGuidanceData[selectedOperation][selectedFunction]) {
+            
+            const guidance = this.fileGuidanceData[selectedOperation][selectedFunction];
+            
+            // Update function description
+            const descriptionElement = document.getElementById('functionDescription');
+            if (descriptionElement) {
+                descriptionElement.textContent = guidance.description || 'ไม่มีคำอธิบาย';
+            }
+            
+            // Update accepted files
+            const acceptedFilesElement = document.getElementById('acceptedFiles');
+            if (acceptedFilesElement) {
+                acceptedFilesElement.textContent = guidance.acceptedFiles.join(', ') || 'ไม่ระบุ';
+                acceptedFilesElement.className = 'highlight';
+            }
+            
+            // Update example
+            const exampleElement = document.getElementById('fileExample');
+            if (exampleElement) {
+                exampleElement.textContent = guidance.example || 'ไม่มีตัวอย่าง';
+            }
+            
+            // Show the function details
+            functionDetailsDiv.style.display = 'block';
+            
+            // Show date range section for functions that need it
+            this.updateDateRangeVisibility(selectedFunction);
+            
+            // Preview date range if file is already selected
+            if (this.elements.fileInput && this.elements.fileInput.files.length > 0) {
+                this.previewDateRangeIfNeeded(this.elements.fileInput.files[0]);
+            }
+            
+            console.log('Function details updated for:', selectedFunction);
+        } else {
+            // Hide function details if no function selected
+            functionDetailsDiv.style.display = 'none';
+            this.updateDateRangeVisibility('');
+            this.hideDatePreview();
+        }
+    }
+
+    updateDateRangeVisibility(selectedFunction) {
+        const dateRangeSection = this.elements.dateRangeSection;
+        
+        if (!dateRangeSection) {
+            console.log('Date range section not found');
+            return;
+        }
+
+        // Functions that need date range selection
+        const functionsNeedingDateRange = [
+            'DIE_ATTACK_AUTO_UPH',
+            'PNP_AUTO_UPH',
+            'WB_AUTO_UPH'
+        ];
+
+        if (functionsNeedingDateRange.includes(selectedFunction)) {
+            dateRangeSection.style.display = 'block';
+            this.setupDateRangeHandlers();
+        } else {
+            dateRangeSection.style.display = 'none';
+        }
+    }
+
+    setupDateRangeHandlers() {
+        if (this.elements.useAllDates) {
+            this.elements.useAllDates.addEventListener('change', () => {
+                const isChecked = this.elements.useAllDates.checked;
+                
+                if (this.elements.startDate) {
+                    this.elements.startDate.disabled = isChecked;
+                    this.elements.startDate.required = !isChecked;
+                }
+                
+                if (this.elements.endDate) {
+                    this.elements.endDate.disabled = isChecked;
+                    this.elements.endDate.required = !isChecked;
+                }
+            });
+        }
+
+        // Set default dates if not using all dates
+        if (this.elements.startDate && this.elements.endDate) {
+            const today = new Date();
+            const oneMonthAgo = new Date(today);
+            oneMonthAgo.setMonth(today.getMonth() - 1);
+            
+            this.elements.startDate.value = oneMonthAgo.toISOString().split('T')[0];
+            this.elements.endDate.value = today.toISOString().split('T')[0];
+        }
+    }
+
     validateFiles(files) {
         for (let file of files) {
             // Check file size
@@ -736,6 +863,47 @@ class IndexPage {
         }
 
         return { isValid: true };
+    }
+
+    validateDateRange() {
+        const selectedFunction = this.elements.funcSelect?.value || '';
+        const functionsNeedingDateRange = [
+            'DIE_ATTACK_AUTO_UPH',
+            'PNP_AUTO_UPH',
+            'WB_AUTO_UPH'
+        ];
+
+        // If function doesn't need date range, validation passes
+        if (!functionsNeedingDateRange.includes(selectedFunction)) {
+            return true;
+        }
+
+        // If using all dates, validation passes
+        if (this.elements.useAllDates && this.elements.useAllDates.checked) {
+            return true;
+        }
+
+        // Check if both dates are provided
+        if (!this.elements.startDate || !this.elements.endDate) {
+            this.showMessage('ไม่พบช่องกรอกวันที่', 'error');
+            return false;
+        }
+
+        const startDate = this.elements.startDate.value;
+        const endDate = this.elements.endDate.value;
+
+        if (!startDate || !endDate) {
+            this.showMessage('กรุณากรอกวันที่เริ่มต้นและสิ้นสุด หรือเลือก "ใช้ข้อมูลทั้งหมด"', 'error');
+            return false;
+        }
+
+        // Check if start date is before end date
+        if (new Date(startDate) > new Date(endDate)) {
+            this.showMessage('วันที่เริ่มต้นต้องมาก่อนวันที่สิ้นสุด', 'error');
+            return false;
+        }
+
+        return true;
     }
 
     formatFileSize(bytes) {
@@ -868,6 +1036,104 @@ class IndexPage {
             }
         } catch (e) {
             console.log('Could not restore form state:', e);
+        }
+    }
+
+    previewDateRangeIfNeeded(file) {
+        const selectedFunction = this.elements.funcSelect?.value || '';
+        const functionsNeedingDateRange = [
+            'DIE_ATTACK_AUTO_UPH',
+            'PNP_AUTO_UPH',
+            'WB_AUTO_UPH'
+        ];
+
+        // Only preview for functions that need date range
+        if (!functionsNeedingDateRange.includes(selectedFunction)) {
+            this.hideDatePreview();
+            return;
+        }
+
+        // Check if file is Excel
+        if (!file.name.toLowerCase().endsWith('.xlsx') && !file.name.toLowerCase().endsWith('.xls')) {
+            this.hideDatePreview();
+            return;
+        }
+
+        this.previewDateRange(file);
+    }
+
+    async previewDateRange(file) {
+        const datePreviewSection = document.getElementById('datePreviewSection');
+        
+        if (!datePreviewSection) {
+            console.log('Date preview section not found');
+            return;
+        }
+
+        try {
+            // Show loading
+            this.showMessage('กำลังวิเคราะห์ข้อมูลวันที่...', 'info');
+            
+            // Create FormData
+            const formData = new FormData();
+            formData.append('file', file);
+
+            // Call API
+            const response = await fetch('/api/preview-date-range', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                this.showDatePreview(result.data);
+                this.showMessage('วิเคราะห์ข้อมูลวันที่เรียบร้อย', 'success');
+            } else {
+                this.hideDatePreview();
+                this.showMessage(result.error || 'ไม่สามารถวิเคราะห์ข้อมูลวันที่ได้', 'warning');
+            }
+
+        } catch (error) {
+            console.error('Error previewing date range:', error);
+            this.hideDatePreview();
+            this.showMessage('เกิดข้อผิดพลาดในการวิเคราะห์ข้อมูลวันที่', 'error');
+        }
+    }
+
+    showDatePreview(dateInfo) {
+        const datePreviewSection = document.getElementById('datePreviewSection');
+        const fileStartDate = document.getElementById('fileStartDate');
+        const fileEndDate = document.getElementById('fileEndDate');
+        const fileTotalDays = document.getElementById('fileTotalDays');
+        const fileRecordCount = document.getElementById('fileRecordCount');
+
+        if (datePreviewSection && fileStartDate && fileEndDate && fileTotalDays && fileRecordCount) {
+            // Format dates in Western calendar (AD/CE) format
+            const startDate = new Date(dateInfo.min_date).toLocaleDateString('en-GB'); // DD/MM/YYYY format
+            const endDate = new Date(dateInfo.max_date).toLocaleDateString('en-GB'); // DD/MM/YYYY format
+
+            // Update content
+            fileStartDate.textContent = startDate;
+            fileEndDate.textContent = endDate;
+            fileTotalDays.textContent = `${dateInfo.total_days.toLocaleString()} วัน`;
+            fileRecordCount.textContent = `${dateInfo.valid_records.toLocaleString()} แถว`;
+
+            // Show the section
+            datePreviewSection.style.display = 'block';
+
+            // Auto-set date range inputs if not using all dates
+            if (this.elements.startDate && this.elements.endDate && !this.elements.useAllDates?.checked) {
+                this.elements.startDate.value = dateInfo.min_date;
+                this.elements.endDate.value = dateInfo.max_date;
+            }
+        }
+    }
+
+    hideDatePreview() {
+        const datePreviewSection = document.getElementById('datePreviewSection');
+        if (datePreviewSection) {
+            datePreviewSection.style.display = 'none';
         }
     }
 }

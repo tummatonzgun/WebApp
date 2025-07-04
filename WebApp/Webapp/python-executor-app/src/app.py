@@ -10,6 +10,9 @@ import logging
 from typing import Tuple, List, Optional, Dict, Any
 from dataclasses import dataclass
 from enum import Enum
+import time
+import threading
+from datetime import datetime, timedelta
 
 
 # Import custom modules
@@ -234,7 +237,7 @@ class FunctionService:
         return functions
     
     @staticmethod
-    def execute_function(func_name: str, input_dir: str, output_dir: str) -> None:
+    def execute_function(func_name: str, input_dir: str, output_dir: str, **kwargs) -> None:
         """
         Execute a function module
         
@@ -242,14 +245,24 @@ class FunctionService:
             func_name: Name of the function to execute
             input_dir: Input directory path
             output_dir: Output directory path
+            **kwargs: Additional arguments to pass to the function
         """
         try:
             logger.info(f"Executing function: {func_name}")
             logger.info(f"Input directory: {input_dir}")
             logger.info(f"Output directory: {output_dir}")
+            logger.info(f"Additional arguments: {kwargs}")
             
             module = importlib.import_module(f"functions.{func_name}")
-            module.run(input_dir, output_dir)
+            
+            # Check if function accepts additional arguments
+            import inspect
+            sig = inspect.signature(module.run)
+            
+            if len(sig.parameters) > 2:  # More than input_dir and output_dir
+                module.run(input_dir, output_dir, **kwargs)
+            else:
+                module.run(input_dir, output_dir)
             
         except ImportError as e:
             logger.error(f"Function module not found: {func_name} - {e}")
@@ -265,13 +278,14 @@ class FileProcessingService:
     """Service for file processing operations"""
     
     @staticmethod
-    def process_uploaded_files(files: List, func_name: str) -> Tuple[str, str]:
+    def process_uploaded_files(files: List, func_name: str, **kwargs) -> Tuple[str, str]:
         """
         Process uploaded files and execute function
         
         Args:
             files: List of uploaded files
             func_name: Function name to execute
+            **kwargs: Additional arguments to pass to function
             
         Returns:
             Tuple of (temp_input_dir, output_dir)
@@ -289,8 +303,8 @@ class FileProcessingService:
                     file.save(file_path)
                     logger.info(f"Saved uploaded file: {file.filename}")
             
-            # Execute function
-            FunctionService.execute_function(func_name, temp_input, output_dir)
+            # Execute function with additional arguments
+            FunctionService.execute_function(func_name, temp_input, output_dir, **kwargs)
             
             return temp_input, output_dir
             
@@ -300,7 +314,7 @@ class FileProcessingService:
             raise e
     
     @staticmethod
-    def process_folder_files(selected_folder: str, selected_files: List[str], func_name: str) -> Tuple[str, str]:
+    def process_folder_files(selected_folder: str, selected_files: List[str], func_name: str, **kwargs) -> Tuple[str, str]:
         """
         Process files from folder selection
         
@@ -308,6 +322,7 @@ class FileProcessingService:
             selected_folder: Path to selected folder
             selected_files: List of selected file names
             func_name: Function name to execute
+            **kwargs: Additional arguments to pass to function
             
         Returns:
             Tuple of (temp_input_dir, output_dir)
@@ -333,8 +348,8 @@ class FileProcessingService:
             
             logger.info(f"Successfully copied {copied_files} files to temp directory")
             
-            # Execute function
-            FunctionService.execute_function(func_name, temp_input, output_dir)
+            # Execute function with additional arguments
+            FunctionService.execute_function(func_name, temp_input, output_dir, **kwargs)
             
             return temp_input, output_dir
             
@@ -581,6 +596,19 @@ def index():
                 flash("กรุณาเลือกฟังก์ชันที่ต้องการประมวลผล", MessageType.ERROR.value)
                 return redirect(url_for("index"))
 
+            # Get date range parameters
+            start_date = request.form.get('start_date')
+            end_date = request.form.get('end_date')
+            use_all_dates = request.form.get('use_all_dates') == 'on'
+            
+            # Prepare additional arguments for function
+            func_args = {}
+            if func_name in ['DIE_ATTACK_AUTO_UPH', 'PNP_AUTO_UPH', 'WB_AUTO_UPH']:
+                func_args['start_date'] = start_date
+                func_args['end_date'] = end_date
+                func_args['use_all_dates'] = use_all_dates
+                logger.info(f"Date range parameters - start: {start_date}, end: {end_date}, use_all: {use_all_dates}")
+
             # Check input method
             input_method = request.form.get('inputMethod', 'upload')
             temp_input = None
@@ -599,7 +627,7 @@ def index():
                 # Process folder files using service
                 try:
                     temp_input, output_dir = FileProcessingService.process_folder_files(
-                        selected_folder, selected_filenames, func_name
+                        selected_folder, selected_filenames, func_name, **func_args
                     )
                 except Exception as e:
                     ErrorHandler.log_and_flash_error(e, "Folder file processing")
@@ -614,7 +642,7 @@ def index():
                 
                 # Process uploaded files using service
                 try:
-                    temp_input, output_dir = FileProcessingService.process_uploaded_files(files, func_name)
+                    temp_input, output_dir = FileProcessingService.process_uploaded_files(files, func_name, **func_args)
                 except Exception as e:
                     ErrorHandler.log_and_flash_error(e, "File upload processing")
                     return redirect(url_for("index"))
@@ -712,7 +740,71 @@ def download_file(func_name, filename):
         flash(f"เกิดข้อผิดพลาดในการดาวน์โหลด: {str(e)}", MessageType.ERROR.value)
         return redirect(url_for("index"))
 
-@app.route("/lookup_last_type", methods=["GET", "POST"]) 
+@app.route("/api/preview-date-range", methods=["POST"])
+def preview_date_range_api():
+    """API สำหรับดู preview ช่วงวันที่ในไฟล์"""
+    try:
+        # ตรวจสอบการอัปโหลดไฟล์
+        if 'file' not in request.files:
+            return jsonify({'error': 'ไม่พบไฟล์ที่อัปโหลด'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'ไม่ได้เลือกไฟล์'}), 400
+        
+        # ตรวจสอบนามสกุลไฟล์
+        if not file.filename.lower().endswith(('.xlsx', '.xls')):
+            return jsonify({'error': 'รองรับเฉพาะไฟล์ Excel (.xlsx, .xls)'}), 400
+        
+        # บันทึกไฟล์ชั่วคราว
+        temp_dir = tempfile.mkdtemp()
+        temp_file_path = os.path.join(temp_dir, file.filename)
+        file.save(temp_file_path)
+        
+        try:
+            # นำเข้าฟังก์ชัน preview_date_range
+            import importlib
+            die_attack_module = importlib.import_module('functions.DIE_ATTACK_AUTO_UPH')
+            preview_date_range = die_attack_module.preview_date_range
+            
+            # วิเคราะห์ข้อมูลวันที่
+            date_info = preview_date_range(temp_file_path)
+            
+            if date_info:
+                # แปลงข้อมูลวันที่ให้เป็น JSON serializable format
+                serializable_data = {}
+                for key, value in date_info.items():
+                    if key == 'monthly_distribution' and isinstance(value, dict):
+                        # แปลง Period objects เป็น string format
+                        serializable_data[key] = {
+                            str(period): count for period, count in value.items()
+                        }
+                    elif hasattr(value, 'strftime'):
+                        # แปลง datetime objects เป็น string format (ค.ศ.)
+                        serializable_data[key] = value.strftime('%Y-%m-%d')
+                    else:
+                        serializable_data[key] = value
+                
+                return jsonify({
+                    'success': True,
+                    'data': serializable_data,
+                    'message': 'วิเคราะห์ข้อมูลวันที่เรียบร้อย'
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': 'ไม่สามารถวิเคราะห์ข้อมูลวันที่ได้'
+                }), 400
+                
+        finally:
+            # ลบไฟล์ชั่วคราว
+            shutil.rmtree(temp_dir)
+            
+    except Exception as e:
+        logger.error(f"Error in preview_date_range_api: {e}")
+        return jsonify({'error': f'เกิดข้อผิดพลาด: {str(e)}'}), 500
+
+@app.route("/lookup_last_type", methods=["GET", "POST"])
 def lookup_last_type_route():
     table_html = None
     download_link = None
@@ -889,12 +981,131 @@ def setup_logging() -> logging.Logger:
 
 logger = setup_logging()
 
-if __name__ == "__main__":
-    # ===== การเตรียมโฟลเดอร์และเริ่มต้น Application =====
+# ===== FILE CLEANUP SERVICE =====
+class FileCleanupService:
+    """Service สำหรับจัดการทำความสะอาดไฟล์เก่า"""
     
+    @staticmethod
+    def cleanup_old_files(directory: str, days_old: int = 7, dry_run: bool = False) -> Dict[str, int]:
+        """
+        ลบไฟล์เก่าที่เก็บไว้เกินกำหนด
+        
+        Args:
+            directory: โฟลเดอร์ที่ต้องการทำความสะอาด
+            days_old: จำนวนวันที่จะเก็บไฟล์ (default: 7 วัน)
+            dry_run: ถ้า True จะแสดงผลเฉพาะไฟล์ที่จะลบ (ไม่ลบจริง)
+            
+        Returns:
+            Dict ที่มีสถิติการลบไฟล์
+        """
+        if not os.path.exists(directory):
+            return {"deleted": 0, "total_size": 0, "error": "Directory not found"}
+        
+        cutoff_date = datetime.now() - timedelta(days=days_old)
+        deleted_count = 0
+        deleted_size = 0
+        errors = []
+        
+        try:
+            for filename in os.listdir(directory):
+                file_path = os.path.join(directory, filename)
+                
+                # ตรวจสอบว่าเป็นไฟล์และไม่ใช่โฟลเดอร์
+                if os.path.isfile(file_path):
+                    try:
+                        # ตรวจสอบวันที่แก้ไขล่าสุด
+                        file_mtime = datetime.fromtimestamp(os.path.getmtime(file_path))
+                        
+                        if file_mtime < cutoff_date:
+                            file_size = os.path.getsize(file_path)
+                            
+                            if not dry_run:
+                                os.remove(file_path)
+                                logger.info(f"🗑️ ลบไฟล์เก่า: {filename} (อายุ: {(datetime.now() - file_mtime).days} วัน)")
+                            
+                            deleted_count += 1
+                            deleted_size += file_size
+                            
+                    except Exception as e:
+                        errors.append(f"Error processing {filename}: {str(e)}")
+                        logger.error(f"Error deleting file {filename}: {e}")
+                        
+        except Exception as e:
+            errors.append(f"Error accessing directory: {str(e)}")
+            logger.error(f"Error accessing directory {directory}: {e}")
+        
+        return {
+            "deleted": deleted_count,
+            "total_size": deleted_size,
+            "errors": errors,
+            "cutoff_date": cutoff_date.strftime("%Y-%m-%d %H:%M:%S")
+        }
+    
+    @staticmethod
+    def cleanup_all_output_folders(days_old: int = 7, dry_run: bool = False) -> Dict[str, Dict]:
+        """ทำความสะอาดโฟลเดอร์ output ทั้งหมด"""
+        output_dirs = [
+            os.path.join(config.BASE_DIR, "output_lookup_last_type"),
+            os.path.join(config.BASE_DIR, "output_DIE_ATTACK_AUTO_UPH"),
+            os.path.join(config.BASE_DIR, "output_PNP_AUTO_UPH"),
+            os.path.join(config.BASE_DIR, "output_WB_AUTO_UPH"),
+            os.path.join(config.BASE_DIR, "output_PNP_CHANG_TYPE"),
+        ]
+        
+        results = {}
+        total_deleted = 0
+        total_size = 0
+        
+        for output_dir in output_dirs:
+            if os.path.exists(output_dir):
+                folder_name = os.path.basename(output_dir)
+                result = FileCleanupService.cleanup_old_files(output_dir, days_old, dry_run)
+                results[folder_name] = result
+                total_deleted += result["deleted"]
+                total_size += result["total_size"]
+        
+        results["summary"] = {
+            "total_deleted": total_deleted,
+            "total_size_mb": round(total_size / (1024 * 1024), 2),
+            "cleanup_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        
+        return results
+    
+    @staticmethod
+    def schedule_cleanup():
+        """ตั้งเวลาทำความสะอาดไฟล์เก่าทุก 24 ชั่วโมง"""
+        def cleanup_job():
+            while True:
+                try:
+                    logger.info("🧹 เริ่มทำความสะอาดไฟล์เก่า...")
+                    results = FileCleanupService.cleanup_all_output_folders(days_old=7, dry_run=False)
+                    
+                    if results["summary"]["total_deleted"] > 0:
+                        logger.info(f"✅ ทำความสะอาดเสร็จสิ้น: ลบ {results['summary']['total_deleted']} ไฟล์ "
+                                  f"ประหยัดพื้นที่ {results['summary']['total_size_mb']} MB")
+                    else:
+                        logger.info("ℹ️ ไม่มีไฟล์เก่าที่ต้องลบ")
+                    
+                    # รอ 24 ชั่วโมง (86400 วินาที)
+                    time.sleep(86400)
+                    
+                except Exception as e:
+                    logger.error(f"Error in cleanup job: {e}")
+                    time.sleep(3600)  # รอ 1 ชั่วโมงแล้วลองใหม่
+        
+        # เริ่ม background thread
+        cleanup_thread = threading.Thread(target=cleanup_job, daemon=True)
+        cleanup_thread.start()
+        logger.info("🕐 ตั้งระบบทำความสะอาดไฟล์เก่าแล้ว (ทุก 24 ชั่วโมง)")
+
+if __name__ == "__main__":
     # สร้างโฟลเดอร์ที่จำเป็น
     os.makedirs(os.path.join(config.BASE_DIR, AppConstants.OUTPUT_DIR_LOOKUP), exist_ok=True)
     os.makedirs(config.FUNCTIONS_DIR, exist_ok=True)
+    
+    # ⭐ เริ่มระบบทำความสะอาดไฟล์เก่าอัตโนมัติ
+    FileCleanupService.schedule_cleanup()
     
     # หา IP address สำหรับแสดงใน log
     try:
