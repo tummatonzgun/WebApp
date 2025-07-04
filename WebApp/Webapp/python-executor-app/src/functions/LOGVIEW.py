@@ -909,7 +909,7 @@ def run(input_path, output_dir):
     
     # 3. ตรวจสอบไฟล์ package
     print("📊 ขั้นตอนที่ 3: ตรวจสอบไฟล์ package...")
-    package_path = os.path.join(BASE_DIR, "..", "Upload", "export package and frame stock Rev.04.xlsx")
+    package_path = os.path.join(BASE_DIR, "..", "Upload", "export package and frame stock Rev.06.xlsx")
     package_path = os.path.abspath(package_path)
     
     print(f"   📁 ตรวจสอบ package path: {package_path}")
