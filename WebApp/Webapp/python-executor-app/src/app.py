@@ -794,7 +794,7 @@ def preview_date_range_api():
                 return jsonify({
                     'success': False,
                     'error': 'ไม่สามารถวิเคราะห์ข้อมูลวันที่ได้'
-                }), 400
+                }, 400)
                 
         finally:
             # ลบไฟล์ชั่วคราว
@@ -1094,9 +1094,9 @@ class FileCleanupService:
 def process_logview_all():
     try:
         from functions.LOGVIEW import run
-        data_logview = os.path.abspath(os.path.join(config.BASE_DIR, "..", "data_logview"))
-        output_dir = os.path.join(config.BASE_DIR, "output_LOGVIEW")  # ✅ อยู่ใน src/output_LOGVIEW
-        os.makedirs(output_dir, exist_ok=True)  # ⭐ สร้างโฟลเดอร์ถ้ายังไม่มี
+        data_logview = os.path.join(config.BASE_DIR, "data_logview")  # ✅ ชี้ไปที่ src/data_logview
+        output_dir = os.path.join(config.BASE_DIR, "output_LOGVIEW")
+        os.makedirs(output_dir, exist_ok=True)
         run(data_logview, output_dir)
         flash("ประมวลผล LOGVIEW ทั้งหมดเสร็จสิ้น!", "success")
     except Exception as e:
