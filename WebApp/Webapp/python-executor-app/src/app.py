@@ -894,15 +894,6 @@ def lookup_last_type_route():
                          download_link=download_link,
                          total_records=total_records)
 
-@app.errorhandler(404)
-def not_found_error(error):
-    """Handle 404 errors"""
-    return render_template('404.html'), 404
-
-@app.errorhandler(500)
-def internal_error(error):
-    """Handle 500 errors"""
-    return render_template('500.html'), 500
 
 @app.errorhandler(Exception)
 def handle_exception(e):
@@ -1098,6 +1089,21 @@ class FileCleanupService:
         cleanup_thread = threading.Thread(target=cleanup_job, daemon=True)
         cleanup_thread.start()
         logger.info("🕐 ตั้งระบบทำความสะอาดไฟล์เก่าแล้ว (ทุก 24 ชั่วโมง)")
+
+@app.route("/process_logview_all")
+def process_logview_all():
+    try:
+        from functions.LOGVIEW import run
+        data_logview = os.path.abspath(os.path.join(config.BASE_DIR, "..", "data_logview"))
+        output_dir = os.path.join(config.BASE_DIR, "output_LOGVIEW")  # ✅ อยู่ใน src/output_LOGVIEW
+        os.makedirs(output_dir, exist_ok=True)  # ⭐ สร้างโฟลเดอร์ถ้ายังไม่มี
+        run(data_logview, output_dir)
+        flash("ประมวลผล LOGVIEW ทั้งหมดเสร็จสิ้น!", "success")
+    except Exception as e:
+        import traceback
+        logger.error(f"Error in process_logview_all: {e}\n{traceback.format_exc()}")
+        flash(f"เกิดข้อผิดพลาด: {e}", "error")
+    return redirect(url_for("index"))
 
 if __name__ == "__main__":
     # สร้างโฟลเดอร์ที่จำเป็น

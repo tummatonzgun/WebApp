@@ -81,6 +81,7 @@
                 </label>
                 <select name="func_name" id="funcSelect" class="form-control" required>
                     <option value="">เลือกฟังก์ชัน</option>
+                    <option value="PNP_CHANGE_TYPE">PNP_CHANGE_TYPE</option>
                 </select>
             </div>
 
@@ -150,7 +151,7 @@
                 </div>
                 <div class="date-options">
                     <div class="option-item">
-                        <input type="checkbox" id="useAllDates" name="use_all_dates" checked>
+                        <input type="checkbox" id="useAllDates" name="use_all_dates">
                         <label for="useAllDates">
                             <i class="fas fa-check-square"></i> ใช้ข้อมูลทั้งหมด (ไม่จำกัดช่วงวันที่)
                         </label>
@@ -248,6 +249,10 @@
             <a href="{{ url_for('lookup_last_type_route') }}" id="lookupLastTypeLink" 
                class="btn btn-secondary" style="display: none;">
                 <i class="fas fa-search"></i> ค้นหา Last_type จาก BOM
+            </a>
+            <a href="{{ url_for('process_logview_all') }}" id="processLogviewAllBtn" 
+               class="btn btn-warning">
+                <i class="fas fa-play"></i> ALL FRAME STOCK
             </a>
         </div>
     </div>

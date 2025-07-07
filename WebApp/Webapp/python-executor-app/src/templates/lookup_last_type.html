@@ -8,7 +8,7 @@
 
 {% block content %}
 <div class="container">
-    <!-- Page Header -->
+    <!-- Header -->
     <div class="page-header">
         <div class="header-content">
             <i class="fas fa-search header-icon"></i>
@@ -16,18 +16,14 @@
             <p class="header-subtitle">อัปโหลดไฟล์ BOM เพื่อค้นหาข้อมูล Last_type อัตโนมัติ</p>
         </div>
     </div>
-
     <!-- Navigation -->
-    <div class="form-container">
-        <div class="navigation-section">
-            <div class="nav-group">
-                <a href="{{ url_for('index') }}" class="btn btn-secondary">
-                    <i class="fas fa-home"></i> กลับหน้าแรก
-                </a>
-            </div>
+    <div class="navigation-section">
+        <div class="nav-group">
+            <a href="{{ url_for('index') }}" class="btn btn-secondary">
+                <i class="fas fa-home"></i> กลับหน้าแรก
+            </a>
         </div>
     </div>
-
     <!-- Flash Messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
@@ -42,79 +38,52 @@
     </div>
     {% endif %}
     {% endwith %}
-
+    <!-- Form -->
     <div class="form-container">
         <form method="post" enctype="multipart/form-data" id="lookupForm" onsubmit="return handleSubmit()">
-            
-            <!-- Upload Area ที่สวยงาม -->
             <div class="upload-area" id="uploadArea" onclick="document.getElementById('file').click()">
                 <div class="upload-content">
-                    <div class="upload-icon">
-                        <i class="fas fa-cloud-upload-alt"></i>
-                    </div>
+                    <div class="upload-icon"><i class="fas fa-cloud-upload-alt"></i></div>
                     <div class="upload-text">คลิกเพื่อเลือกไฟล์หรือลากไฟล์มาวางที่นี่</div>
-                    <div class="upload-subtext">รองรับไฟล์ Excel (.xlsx, .xls) ที่มีคอลัมน์ bom_no</div>
+                    <div class="upload-subtext">รองรับไฟล์ Excel (.xlsx, .xls, .csv) ที่มีคอลัมน์ bom_no</div>
                     <div class="upload-formats">
                         <span class="format-badge">.XLSX</span>
                         <span class="format-badge">.XLS</span>
                         <span class="format-badge">.CSV</span>
                     </div>
                 </div>
-                
-                <!-- Hidden file input -->
-                <input type="file" name="file" id="file" accept=".xlsx,.xls" onchange="handleFileSelect(this)" style="display: none;">
+                <input type="file" name="file" id="file" accept=".xlsx,.xls,.csv" onchange="handleFileSelect(this)" style="display: none;">
             </div>
-
-            <!-- File info display -->
             <div id="fileInfo" class="file-info"></div>
-
-            <!-- Submit button -->
-            <button type="submit" class="submit-btn" id="submitBtn" disabled>
-                <span class="btn-content">
-                    <i class="fas fa-search"></i>
-                    <span class="btn-text">ค้นหา Last_type</span>
-                </span>
-                <div class="btn-loader">
-                    <i class="fas fa-spinner fa-spin"></i>
-                    กำลังประมวลผล...
-                </div>
-            </button>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary btn-lg" id="submitBtn" disabled>
+                    <span class="btn-content"><i class="fas fa-search"></i> <span class="btn-text">ค้นหา Last_type</span></span>
+                    <div class="btn-loader" style="display:none;"><i class="fas fa-spinner fa-spin"></i> กำลังประมวลผล...</div>
+                </button>
+            </div>
         </form>
     </div>
-
     <!-- Loading Animation -->
     <div class="lookup-loading" id="lookupLoading" style="display: none;">
         <div class="lookup-loading-spinner"></div>
-        <div class="lookup-loading-content">
-            <i class="fas fa-cog fa-spin"></i> กำลังค้นหาข้อมูล กรุณารอสักครู่...
-        </div>
+        <div class="lookup-loading-content"><i class="fas fa-cog fa-spin"></i> กำลังค้นหาข้อมูล กรุณารอสักครู่...</div>
     </div>
-
     {% if table_html %}
-        <div class="result-section">
-            <div class="result-header">
-                <h3 class="result-title">
-                    <i class="fas fa-table"></i> ผลลัพธ์การค้นหา
-                </h3>
-                {% if download_link %}
-                    <a href="{{ download_link }}" class="download-btn">
-                        <i class="fas fa-download"></i>ดาวน์โหลด Excel
-                    </a>
-                {% endif %}
-            </div>
-            
-            {% if total_records %}
-            <div class="stats-card">
-                <i class="fas fa-chart-bar"></i>
-                <div class="stats-number">{{ total_records }}</div>
-                <div class="stats-label">จำนวนรายการทั้งหมด</div>
-            </div>
+    <div class="result-section">
+        <div class="result-header">
+            <h3 class="result-title"><i class="fas fa-table"></i> ผลลัพธ์การค้นหา</h3>
+            {% if download_link %}
+            <a href="{{ download_link }}" class="download-btn"><i class="fas fa-download"></i>ดาวน์โหลด Excel</a>
             {% endif %}
-            
-            <div class="table-container" id="tableArea">
-                {{ table_html|safe }}
-            </div>
         </div>
+        {% if total_records %}
+        <div class="stats-card"><i class="fas fa-chart-bar"></i>
+            <div class="stats-number">{{ total_records }}</div>
+            <div class="stats-label">จำนวนรายการทั้งหมด</div>
+        </div>
+        {% endif %}
+        <div class="table-container" id="tableArea">{{ table_html|safe }}</div>
+    </div>
     {% else %}
     <div class="empty-state">
         <i class="fas fa-search"></i>
@@ -131,45 +100,23 @@
     </div>
     {% endif %}
 </div>
+{% endblock %}
 
+{% block js %}
 <script>
 let isSubmitting = false;
-
-// Handle file selection
 function handleFileSelect(input) {
     const fileInfo = document.getElementById('fileInfo');
     const submitBtn = document.getElementById('submitBtn');
     const uploadArea = document.getElementById('uploadArea');
-    
     if (input.files && input.files[0]) {
         const file = input.files[0];
         const fileSize = (file.size / 1024 / 1024).toFixed(2);
-        
-        // Update file info
-        fileInfo.innerHTML = `
-            <div class="selected-file">
-                <div class="file-icon">
-                    <i class="fas fa-file-excel"></i>
-                </div>
-                <div class="file-details">
-                    <div class="file-name">${file.name}</div>
-                    <div class="file-size">${fileSize} MB</div>
-                </div>
-                <div class="file-status">
-                    <i class="fas fa-check-circle"></i>
-                    พร้อมอัปโหลด
-                </div>
-            </div>
-        `;
+        fileInfo.innerHTML = `<div class="selected-file"><div class="file-icon"><i class="fas fa-file-excel"></i></div><div class="file-details"><div class="file-name">${file.name}</div><div class="file-size">${fileSize} MB</div></div><div class="file-status"><i class="fas fa-check-circle"></i> พร้อมอัปโหลด</div></div>`;
         fileInfo.classList.add('show');
-        
-        // Enable submit button
         submitBtn.disabled = false;
         submitBtn.classList.add('enabled');
-        
-        // Update upload area
         uploadArea.classList.add('file-selected');
-        
     } else {
         fileInfo.innerHTML = '';
         fileInfo.classList.remove('show');
@@ -178,50 +125,38 @@ function handleFileSelect(input) {
         uploadArea.classList.remove('file-selected');
     }
 }
-
-// Handle form submission
 function handleSubmit() {
     if (isSubmitting) return false;
-    
     const fileInput = document.getElementById('file');
     const submitBtn = document.getElementById('submitBtn');
     const loadingDiv = document.getElementById('lookupLoading');
-    
     if (!fileInput.files || fileInput.files.length === 0) {
         alert('กรุณาเลือกไฟล์ก่อน');
         return false;
     }
-    
-    // Start loading state
     isSubmitting = true;
     submitBtn.classList.add('loading');
-    
+    submitBtn.querySelector('.btn-content').style.display = 'none';
+    submitBtn.querySelector('.btn-loader').style.display = 'flex';
     if (loadingDiv) {
         loadingDiv.style.display = 'block';
         loadingDiv.classList.add('show');
     }
-    
     return true;
 }
-
-// Handle drag and drop
 document.addEventListener('DOMContentLoaded', function() {
     const uploadArea = document.getElementById('uploadArea');
-    
     uploadArea.addEventListener('dragover', function(e) {
         e.preventDefault();
         uploadArea.classList.add('dragover');
     });
-    
     uploadArea.addEventListener('dragleave', function(e) {
         e.preventDefault();
         uploadArea.classList.remove('dragover');
     });
-    
     uploadArea.addEventListener('drop', function(e) {
         e.preventDefault();
         uploadArea.classList.remove('dragover');
-        
         const files = e.dataTransfer.files;
         if (files.length > 0) {
             const fileInput = document.getElementById('file');

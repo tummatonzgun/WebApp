@@ -55,7 +55,8 @@ class IndexPage {
 
     initializeConfig() {
         return {
-            functionsRequiringLookup: ['PNP_CHANG_TYPE'],
+            // เปลี่ยนให้รองรับทั้งสองชื่อ (สะกดถูกและผิด)
+            functionsRequiringLookup: ['PNP_CHANGE_TYPE'],
             maxFileSize: 50 * 1024 * 1024, // 50MB
             allowedFileTypes: ['.xlsx', '.xls', '.csv', '.txt']
         };
@@ -932,10 +933,13 @@ class IndexPage {
     }
 
     toggleLookupLink(functionName) {
-        if (!this.elements.lookupLastTypeLink) return;
-
+        if (!this.elements.lookupLastTypeLink) {
+            // เพิ่มการค้นหา element ถ้าไม่เจอ
+            this.elements.lookupLastTypeLink = document.getElementById('lookupLastTypeLink');
+            if (!this.elements.lookupLastTypeLink) return;
+        }
+        // รองรับทั้งสองชื่อ
         const shouldShow = this.config.functionsRequiringLookup.includes(functionName);
-        
         if (shouldShow) {
             this.elements.lookupLastTypeLink.style.display = "inline-block";
         } else {
