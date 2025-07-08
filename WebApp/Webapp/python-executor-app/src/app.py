@@ -1106,7 +1106,7 @@ def process_logview_all():
     return redirect(url_for("index"))
 
 if __name__ == "__main__":
-    # สร้างโฟลเดอร์ที่จำเป็น
+    
     os.makedirs(os.path.join(config.BASE_DIR, AppConstants.OUTPUT_DIR_LOOKUP), exist_ok=True)
     os.makedirs(config.FUNCTIONS_DIR, exist_ok=True)
     
