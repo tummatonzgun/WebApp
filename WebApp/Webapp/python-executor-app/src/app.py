@@ -1073,10 +1073,10 @@ class FileCleanupService:
                     results = FileCleanupService.cleanup_all_output_folders(days_old=7, dry_run=False)
                     
                     if results["summary"]["total_deleted"] > 0:
-                        logger.info(f"✅ ทำความสะอาดเสร็จสิ้น: ลบ {results['summary']['total_deleted']} ไฟล์ "
+                        logger.info(f" ทำความสะอาดเสร็จสิ้น: ลบ {results['summary']['total_deleted']} ไฟล์ "
                                   f"ประหยัดพื้นที่ {results['summary']['total_size_mb']} MB")
                     else:
-                        logger.info("ℹ️ ไม่มีไฟล์เก่าที่ต้องลบ")
+                        logger.info("ℹ ไม่มีไฟล์เก่าที่ต้องลบ")
                     
                     # รอ 24 ชั่วโมง (86400 วินาที)
                     time.sleep(86400)
